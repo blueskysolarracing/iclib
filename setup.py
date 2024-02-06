@@ -32,6 +32,7 @@ setup(
         'ina229',
         'mcp23s17',
         'mcp4161',
+        'nhd-c12864a1z-fsw-fbw-htt',
         'sn74hcs137',
         'ti',
         'texas instruments',
