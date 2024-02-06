@@ -80,15 +80,28 @@ Below shows a sample usage of NHD-C12864A1Z-FSW-FBW-HTT.
 
    from nhd-c12864a1z-fsw-fbw-htt import NHDC12864A1ZFSWFBWHTT 
    from periphery import SPI, GPIO
+   import time
 
-   
-    spi = SPI('/dev/spidev0.0', 3, 10e6)
-    a0 = GPIO('/dev/gpiochip0', 8, 'out')
-    not_reset = GPIO('/dev/gpiochip0', 9, 'out')
-    display = NHDC12864A1ZFSWFBWHTT(spi, a0, not_reset)
-    
-    display.init()
-    display.clear_screen()
+   spi = SPI('/dev/spidev0.0', 3, 10e6)
+   a0 = GPIO('/dev/gpiochip0', 8, 'out')
+   not_reset = GPIO('/dev/gpiochip0', 9, 'out')
+   display = NHDC12864A1ZFSWFBWHTT(spi, a0, not_reset)
+
+   display.configure()
+   display.clear_screen()
+
+   display.draw_rect(0, 0, 127, 63)
+
+   display.set_font("dejavusans.ttf")
+   display.set_size(8, 14)
+   display.draw_word("Welcome to Blue Sky solar racing! 12345678910", 2, 2)
+   display.set_size(16, 16)
+   display.draw_word("@#$%*^", 1, int(driver.HEIGHT*0.7))
+   display.display()
+
+   time.sleep(5)
+
+   display.clear_screen()
 
     # Fill screen
     for row in range(display.HEIGHT)
