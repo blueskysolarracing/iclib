@@ -102,3 +102,26 @@ class MCP4161TestCase(TestCase):
         mock_spi.transfer.reset_mock()
         mcp4161.decrement(MemoryAddress.NON_VOLATILE_WIPER_0)
         mock_spi.transfer.assert_called_once_with([0b00101000])
+
+    def test_set_wiper_step(self) -> None:
+        mock_spi = MagicMock(
+            mode=MCP4161.SPI_MODE,
+            max_speed=MCP4161.MAX_SPI_MAX_SPEED,
+            bit_order=MCP4161.SPI_BIT_ORDER,
+            bits_per_word=MCP4161.SPI_WORD_BIT_COUNT,
+            extra_flags=0,
+        )
+        mock_spi.transfer.return_value = [0b11111111, 0b11111111]
+        mcp4161 = MCP4161(mock_spi)
+
+        for step in MCP4161.STEP_RANGE:
+            mcp4161.set_volatile_wiper_step(step)
+            mock_spi.transfer.assert_called_once_with(
+                [step >> 8, step & ((1 << 8) - 1)],
+            )
+            mock_spi.transfer.reset_mock()
+            mcp4161.set_non_volatile_wiper_step(step)
+            mock_spi.transfer.assert_called_once_with(
+                [0b00100000 | (step >> 8), step & ((1 << 8) - 1)],
+            )
+            mock_spi.transfer.reset_mock()

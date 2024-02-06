@@ -44,7 +44,8 @@ Below shows a sample usage of MCP4161.
    spi = SPI('/dev/spidev0.0', 3, 1e6)
    mcp4161 = MCP4161(spi)
 
-   mcp4161.set_step(123)
+   mcp4161.set_wiper_step(123, True)  # eeprom
+   mcp4161.set_wiper_step(123)
 
 Below shows a sample usage of SN74HCS137.
 

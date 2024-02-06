@@ -16,11 +16,11 @@ class MemoryAddress(IntEnum):
 
     VOLATILE_WIPER_0: int = 0x00
     """The volatile wiper 0."""
-    VOLATILE_WIPER_1: int = 0x00
+    VOLATILE_WIPER_1: int = 0x01
     """The volatile wiper 0."""
     NON_VOLATILE_WIPER_0: int = 0x02
     """The non-volatile wiper 0."""
-    NON_VOLATILE_WIPER_1: int = 0x02
+    NON_VOLATILE_WIPER_1: int = 0x03
     """The non-volatile wiper 1."""
     VOLATILE_TCON_REGISTER: int = 0x04
     """The volatile TCON register."""
@@ -351,19 +351,24 @@ class MCP4161:
         """
         self.command(Decrement(memory_address))
 
-    def set_step(self, step: int, eeprom: bool = False) -> None:
-        """Set the volatile or non-volatile wiper step.
+    def set_volatile_wiper_step(self, step: int) -> None:
+        """Set the volatile wiper step.
 
         :param step: The step.
-        :param eeprom: ``True`` if non-volatile, otherwise ``False``.
         :return: ``None``.
         """
-        if eeprom:
-            memory_address = MemoryAddress.NON_VOLATILE_WIPER_0
-        else:
-            memory_address = MemoryAddress.VOLATILE_WIPER_0
-
         if step not in self.STEP_RANGE:
             raise ValueError('invalid step')
 
-        self.write_data(memory_address, step)
+        self.write_data(MemoryAddress.VOLATILE_WIPER_0, step)
+
+    def set_non_volatile_wiper_step(self, step: int) -> None:
+        """Set the non-volatile wiper step.
+
+        :param step: The step.
+        :return: ``None``.
+        """
+        if step not in self.STEP_RANGE:
+            raise ValueError('invalid step')
+
+        self.write_data(MemoryAddress.NON_VOLATILE_WIPER_0, step)
