@@ -1,3 +1,5 @@
+"""This module implements the MCP4161 driver."""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import IntEnum
@@ -6,6 +8,180 @@ from warnings import warn
 
 from periphery import SPI
 
+from iclib.utilities import bit_getter
+
+
+class MemoryAddress(IntEnum):
+    """The enum class for memory addresses."""
+
+    VOLATILE_WIPER_0: int = 0x00
+    """The volatile wiper 0."""
+    VOLATILE_WIPER_1: int = 0x00
+    """The volatile wiper 0."""
+    NON_VOLATILE_WIPER_0: int = 0x02
+    """The non-volatile wiper 0."""
+    NON_VOLATILE_WIPER_1: int = 0x02
+    """The non-volatile wiper 1."""
+    VOLATILE_TCON_REGISTER: int = 0x04
+    """The volatile TCON register."""
+    STATUS_REGISTER: int = 0x05
+    """The status register."""
+
+
+class STATUSBits(int):
+    """The class for STATUS bits."""
+
+    EEWA = property(bit_getter(4))
+    """Get the EEWA bit."""
+    WL1 = property(bit_getter(3))
+    """Get the WL1 bit."""
+    WL0 = property(bit_getter(2))
+    """Get the WL0 bit."""
+    SHDN = property(bit_getter(1))
+    """Get the SHDN bit."""
+    WP = property(bit_getter(0))
+    """Get the WP bit."""
+
+
+class TCONBits(int):
+    """The class for TCON bits."""
+
+    R1HW = property(bit_getter(7))
+    """Get the R1HW bit."""
+    R1A = property(bit_getter(6))
+    """Get the R1A bit."""
+    R1W = property(bit_getter(5))
+    """Get the R1W bit."""
+    R1B = property(bit_getter(4))
+    """Get the R1B bit."""
+    R0HW = property(bit_getter(3))
+    """Get the R0HW bit."""
+    R0A = property(bit_getter(2))
+    """Get the R0A bit."""
+    R0W = property(bit_getter(1))
+    """Get the R0W bit."""
+    R0B = property(bit_getter(0))
+    """Get the R0B bit."""
+
+
+@dataclass
+class Command(ABC):
+    """The abstract base class class for commands."""
+
+    MEMORY_ADDRESS_OFFSET: ClassVar[int] = 4
+    """The memory address offset for the command byte."""
+    COMMAND_BITS_OFFSET: ClassVar[int] = 2
+    """The command bits offset for the command byte."""
+    COMMAND_BITS: ClassVar[int]
+    """The command bits."""
+    memory_address: int
+    """The memory address."""
+
+    @property
+    @abstractmethod
+    def transmitted_data_bytes(self) -> list[int]:
+        """Return the transmitted data bytes.
+
+        :return: The transmitted data bytes.
+        """
+        pass
+
+    @abstractmethod
+    def parse_received_data_bytes(self, data_bytes: list[int]) -> int | None:
+        """Parse the received data bytes.
+
+        :return: The received data bytes.
+        """
+        pass
+
+
+@dataclass
+class SixteenBitCommand(Command, ABC):
+    """The abstract base class for 8-bit commands."""
+
+    pass
+
+
+@dataclass
+class ReadData(SixteenBitCommand):
+    """The class for read data commands."""
+
+    COMMAND_BITS: ClassVar[int] = 0b11
+    READ_DATA_BIT_COUNT: ClassVar[int] = 9
+    """The number of read data bits."""
+
+    @property
+    def transmitted_data_bytes(self) -> list[int]:
+        return [
+            (
+                (self.memory_address << self.MEMORY_ADDRESS_OFFSET)
+                | (self.COMMAND_BITS << self.COMMAND_BITS_OFFSET)
+                | ((1 << self.COMMAND_BITS_OFFSET) - 1)
+            ),
+            (1 << MCP4161.SPI_WORD_BIT_COUNT) - 1,
+        ]
+
+    def parse_received_data_bytes(self, data_bytes: list[int]) -> int:
+        return (
+            ((data_bytes[0] << MCP4161.SPI_WORD_BIT_COUNT) | data_bytes[1])
+            & ((1 << self.READ_DATA_BIT_COUNT) - 1)
+        )
+
+
+@dataclass
+class WriteData(SixteenBitCommand):
+    """The class for read data commands."""
+
+    COMMAND_BITS: ClassVar[int] = 0b00
+    data: int
+    """The data."""
+
+    @property
+    def transmitted_data_bytes(self) -> list[int]:
+        return [
+            (
+                (self.memory_address << self.MEMORY_ADDRESS_OFFSET)
+                | (self.COMMAND_BITS << self.COMMAND_BITS_OFFSET)
+                | (self.data >> MCP4161.SPI_WORD_BIT_COUNT)
+            ),
+            self.data & ((1 << MCP4161.SPI_WORD_BIT_COUNT) - 1),
+        ]
+
+    def parse_received_data_bytes(self, data_bytes: list[int]) -> None:
+        return None
+
+
+@dataclass
+class EightBitCommand(Command, ABC):
+    """The abstract base class for 8-bit commands."""
+
+    @property
+    def transmitted_data_bytes(self) -> list[int]:
+        return [
+            (self.memory_address << self.MEMORY_ADDRESS_OFFSET)
+            | (self.COMMAND_BITS << self.COMMAND_BITS_OFFSET),
+        ]
+
+
+@dataclass
+class Increment(EightBitCommand):
+    """The class for increment commands."""
+
+    COMMAND_BITS: ClassVar[int] = 0b01
+
+    def parse_received_data_bytes(self, data_bytes: list[int]) -> None:
+        return None
+
+
+@dataclass
+class Decrement(EightBitCommand):
+    """The class for decrement commands."""
+
+    COMMAND_BITS: ClassVar[int] = 0b10
+
+    def parse_received_data_bytes(self, data_bytes: list[int]) -> None:
+        return None
+
 
 @dataclass
 class MCP4161:
@@ -13,140 +189,21 @@ class MCP4161:
     Single/Dual SPI Digital POT with Non-Volatile Memory
     """
 
-    class MemoryAddress(IntEnum):
-        """The enum class for memory addresses."""
-
-        VOLATILE_WIPER_0: int = 0x00
-        """The volatile wiper 0."""
-        NON_VOLATILE_WIPER_0: int = 0x02
-        """The non-volatile wiper 0."""
-        VOLATILE_TCON_REGISTER: int = 0x04
-        """The volatile TCON register."""
-        STATUS_REGISTER: int = 0x05
-        """The status register."""
-
-    @dataclass
-    class Command(ABC):
-        """The abstract base class class for commands."""
-
-        COMMAND_BITS: ClassVar[int]
-        """The command bits."""
-        memory_address: int
-        """The memory address."""
-
-        @property
-        @abstractmethod
-        def transmitted_data(self) -> list[int]:
-            pass
-
-        @abstractmethod
-        def parse(self, received_data: list[int]) -> int | None:
-            pass
-
-    @dataclass
-    class SixteenBitCommand(Command, ABC):
-        """The abstract base class for 8-bit commands."""
-
-        pass
-
-    @dataclass
-    class ReadData(SixteenBitCommand):
-        """The class for read data commands."""
-
-        COMMAND_BITS: ClassVar[int] = 0b11
-
-        @property
-        def transmitted_data(self) -> list[int]:
-            return [
-                (
-                    (self.memory_address << MCP4161.MEMORY_ADDRESS_OFFSET)
-                    | (self.COMMAND_BITS << MCP4161.COMMAND_BITS_OFFSET)
-                    | ((1 << MCP4161.COMMAND_BITS_OFFSET) - 1)
-                ),
-                (1 << MCP4161.SPI_WORD_BIT_COUNT) - 1,
-            ]
-
-        def parse(self, received_data: list[int]) -> int:
-            return (
-                (
-                    (received_data[0] << MCP4161.SPI_WORD_BIT_COUNT)
-                    | received_data[1]
-                )
-                & ((1 << MCP4161.DATA_BIT_COUNT) - 1)
-            )
-
-    @dataclass
-    class WriteData(SixteenBitCommand):
-        """The class for read data commands."""
-
-        COMMAND_BITS: ClassVar[int] = 0b00
-        data: int
-        """The data."""
-
-        @property
-        def transmitted_data(self) -> list[int]:
-            return [
-                (
-                    (self.memory_address << MCP4161.MEMORY_ADDRESS_OFFSET)
-                    | (self.COMMAND_BITS << MCP4161.COMMAND_BITS_OFFSET)
-                    | (self.data >> MCP4161.SPI_WORD_BIT_COUNT)
-                ),
-                self.data & ((1 << MCP4161.SPI_WORD_BIT_COUNT) - 1),
-            ]
-
-        def parse(self, received_data: list[int]) -> None:
-            return None
-
-    @dataclass
-    class EightBitCommand(Command, ABC):
-        """The abstract base class for 8-bit commands."""
-
-        @property
-        def transmitted_data(self) -> list[int]:
-            return [
-                (self.memory_address << MCP4161.MEMORY_ADDRESS_OFFSET)
-                | (self.COMMAND_BITS << MCP4161.COMMAND_BITS_OFFSET),
-            ]
-
-    @dataclass
-    class Increment(EightBitCommand):
-        """The class for increment commands."""
-
-        COMMAND_BITS: ClassVar[int] = 0b01
-
-        def parse(self, received_data: list[int]) -> None:
-            return None
-
-    @dataclass
-    class Decrement(EightBitCommand):
-        """The class for decrement commands."""
-
-        COMMAND_BITS: ClassVar[int] = 0b10
-
-        def parse(self, received_data: list[int]) -> None:
-            return None
-
-    SPI_MODES: ClassVar[tuple[int, int]] = 0b00, 0b11
-    """The supported spi modes."""
+    SPI_MODE: ClassVar[int] = 0b11
+    """The supported spi mode."""
     MAX_SPI_MAX_SPEED: ClassVar[float] = 10e6
     """The supported maximum spi maximum speed."""
     SPI_BIT_ORDER: ClassVar[str] = 'msb'
     """The supported spi bit order."""
     SPI_WORD_BIT_COUNT: ClassVar[int] = 8
     """The supported spi number of bits per word."""
-    MEMORY_ADDRESS_OFFSET: ClassVar[int] = 4
-    """The memory address offset for the command byte."""
-    COMMAND_BITS_OFFSET: ClassVar[int] = 2
-    """The command bits offset for the command byte."""
-    DATA_BIT_COUNT: ClassVar[int] = 9
-    """The supported number of data bits."""
     STEP_RANGE: ClassVar[range] = range(257)
     """The step range."""
     spi: SPI
     """The SPI."""
 
     def __post_init__(self) -> None:
-        if self.spi.mode not in self.SPI_MODES:
+        if self.spi.mode != self.SPI_MODE:
             raise ValueError('unsupported spi mode')
         elif self.spi.max_speed > self.MAX_SPI_MAX_SPEED:
             raise ValueError('unsupported spi maximum speed')
@@ -158,27 +215,104 @@ class MCP4161:
         if self.spi.extra_flags:
             warn(f'unknown spi extra flags {self.spi.extra_flags}')
 
+    @property
+    def VOLATILE_WIPER_0(self) -> int:
+        """Read the VOLATILE_WIPER_0 register.
+
+        :return: The register value.
+        """
+        return self.read_data(MemoryAddress.VOLATILE_WIPER_0)
+
+    @VOLATILE_WIPER_0.setter
+    def VOLATILE_WIPER_0(self, value: int) -> None:
+        """Write to the VOLATILE_WIPER_0 register.
+
+        :param value: The value.
+        :return: ``None``.
+        """
+        self.write_data(MemoryAddress.VOLATILE_WIPER_0, value)
+
+    @property
+    def NON_VOLATILE_WIPER_0(self) -> int:
+        """Read the NON_VOLATILE_WIPER_0 register.
+
+        :return: The register value.
+        """
+        return self.read_data(MemoryAddress.NON_VOLATILE_WIPER_0)
+
+    @NON_VOLATILE_WIPER_0.setter
+    def NON_VOLATILE_WIPER_0(self, value: int) -> None:
+        """Write to the NON_VOLATILE_WIPER_0 register.
+
+        :param value: The value.
+        :return: ``None``.
+        """
+        self.write_data(MemoryAddress.NON_VOLATILE_WIPER_0, value)
+
+    @property
+    def VOLATILE_TCON_REGISTER(self) -> TCONBits:
+        """Read the VOLATILE_TCON_REGISTER register.
+
+        :return: The register value.
+        """
+        return TCONBits(self.read_data(MemoryAddress.VOLATILE_TCON_REGISTER))
+
+    @VOLATILE_TCON_REGISTER.setter
+    def VOLATILE_TCON_REGISTER(self, value: int) -> None:
+        """Write to the VOLATILE_TCON_REGISTER register.
+
+        :param value: The value.
+        :return: ``None``.
+        """
+        self.write_data(MemoryAddress.VOLATILE_TCON_REGISTER, value)
+
+    @property
+    def STATUS_REGISTER(self) -> STATUSBits:
+        """Read the STATUS_REGISTER register.
+
+        :return: The register value.
+        """
+        return STATUSBits(self.read_data(MemoryAddress.STATUS_REGISTER))
+
+    @STATUS_REGISTER.setter
+    def STATUS_REGISTER(self, value: int) -> None:
+        """Write to the STATUS_REGISTER register.
+
+        :param value: The value.
+        :return: ``None``.
+        """
+        self.write_data(MemoryAddress.STATUS_REGISTER, value)
+
     def command(self, *commands: Command) -> list[int | None]:
-        transmitted_data = []
+        """Apply the commands.
+
+        :param commands: The commands.
+        :return: The received data.
+        """
+        transmitted_data_bytes = []
 
         for command in commands:
-            transmitted_data.extend(command.transmitted_data)
+            transmitted_data_bytes.extend(command.transmitted_data_bytes)
 
-        received_data = self.spi.transfer(transmitted_data)
+        received_data_bytes = self.spi.transfer(transmitted_data_bytes)
 
-        assert isinstance(received_data, list)
+        assert isinstance(received_data_bytes, list)
 
-        parsed_data = []
+        parsed_data_bytes = []
         begin = 0
 
         for command in commands:
-            end = begin + len(command.transmitted_data)
+            end = begin + len(command.transmitted_data_bytes)
 
-            parsed_data.append(command.parse(received_data[begin:end]))
+            parsed_data_bytes.append(
+                command.parse_received_data_bytes(
+                    received_data_bytes[begin:end],
+                ),
+            )
 
             begin = end
 
-        return parsed_data
+        return parsed_data_bytes
 
     def read_data(self, memory_address: int) -> int:
         """Read the data at the memory address.
@@ -186,7 +320,7 @@ class MCP4161:
         :param memory_address: The memory address.
         :return: The read data.
         """
-        datum = self.command(self.ReadData(memory_address))[0]
+        datum = self.command(ReadData(memory_address))[0]
 
         assert datum is not None
 
@@ -199,7 +333,7 @@ class MCP4161:
         :param data: The data.
         :return: ``None``.
         """
-        self.command(self.WriteData(memory_address, data))
+        self.command(WriteData(memory_address, data))
 
     def increment(self, memory_address: int) -> None:
         """Increment the data at the memory address.
@@ -207,7 +341,7 @@ class MCP4161:
         :param memory_address: The memory address.
         :return: ``None``.
         """
-        self.command(self.Increment(memory_address))
+        self.command(Increment(memory_address))
 
     def decrement(self, memory_address: int) -> None:
         """Decrement the data at the memory address.
@@ -215,7 +349,7 @@ class MCP4161:
         :param memory_address: The memory address.
         :return: ``None``.
         """
-        self.command(self.Decrement(memory_address))
+        self.command(Decrement(memory_address))
 
     def set_step(self, step: int, eeprom: bool = False) -> None:
         """Set the volatile or non-volatile wiper step.
@@ -225,9 +359,9 @@ class MCP4161:
         :return: ``None``.
         """
         if eeprom:
-            memory_address = self.MemoryAddress.NON_VOLATILE_WIPER_0
+            memory_address = MemoryAddress.NON_VOLATILE_WIPER_0
         else:
-            memory_address = self.MemoryAddress.VOLATILE_WIPER_0
+            memory_address = MemoryAddress.VOLATILE_WIPER_0
 
         if step not in self.STEP_RANGE:
             raise ValueError('invalid step')

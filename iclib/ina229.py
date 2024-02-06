@@ -1,3 +1,5 @@
+"""This module implements the INA229 driver."""
+
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -15,10 +17,6 @@ SPI_BIT_ORDER: str = 'msb'
 """The supported spi bit order."""
 SPI_WORD_BIT_COUNT: int = 8
 """The supported spi number of bits per word."""
-ADDRESS_OFFSET: int = 2
-"""The address offset."""
-READ_OR_WRITE_BIT_OFFSET: int = 0
-"""The fixed-bits offset."""
 
 
 class ReadOrWriteType(StrEnum):
@@ -123,7 +121,7 @@ class SPIFrame(ABC):
     def transmitted_data_bytes(self) -> list[int]:
         return [self.control_byte, *self.data_bytes]
 
-    def parse_received_data(self, data_bytes: list[int]) -> int:
+    def parse_received_data_bytes(self, data_bytes: list[int]) -> int:
         assert len(data_bytes) == self.transmitted_data_byte_count
         assert not data_bytes[0]
 
@@ -203,21 +201,23 @@ class INA229:
         assert isinstance(received_data_bytes, list)
         assert len(transmitted_data_bytes) == len(received_data_bytes)
 
-        parsed_received_data = []
+        parsed_received_data_bytes = []
         begin = 0
 
         for spi_frame in spi_frames:
             end = begin + spi_frame.transmitted_data_byte_count
 
-            parsed_received_data.append(
-                spi_frame.parse_received_data(received_data_bytes[begin:end]),
+            parsed_received_data_bytes.append(
+                spi_frame.parse_received_data_bytes(
+                    received_data_bytes[begin:end],
+                ),
             )
 
             begin = end
 
-        assert len(parsed_received_data) == len(spi_frames)
+        assert len(parsed_received_data_bytes) == len(spi_frames)
 
-        return parsed_received_data
+        return parsed_received_data_bytes
 
     def read(self, register: Register) -> int:
         return self.spi_communicate(SPIReadFrame(register))[0]

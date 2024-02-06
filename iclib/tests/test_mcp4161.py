@@ -1,13 +1,49 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
-from iclib.mcp4161 import MCP4161
+from iclib.mcp4161 import MCP4161, MemoryAddress, STATUSBits, TCONBits
 
 
 class MCP4161TestCase(TestCase):
+    def test_bits(self) -> None:
+        for i in range(8):
+            tcon_bits = TCONBits(1 << i)
+            raw_tcon_bits = (
+                tcon_bits.R0B,
+                tcon_bits.R0W,
+                tcon_bits.R0A,
+                tcon_bits.R0HW,
+                tcon_bits.R1B,
+                tcon_bits.R1W,
+                tcon_bits.R1A,
+                tcon_bits.R1HW,
+            )
+
+            for j, bit in enumerate(raw_tcon_bits):
+                if j == i:
+                    self.assertTrue(bit)
+                else:
+                    self.assertFalse(bit)
+
+        for i in range(5):
+            status_bits = STATUSBits(1 << i)
+            raw_status_bits = (
+                status_bits.WP,
+                status_bits.SHDN,
+                status_bits.WL0,
+                status_bits.WL1,
+                status_bits.EEWA,
+            )
+
+            for j, bit in enumerate(raw_status_bits):
+                if j == i:
+                    self.assertTrue(bit)
+                else:
+                    self.assertFalse(bit)
+
     def test_read_data(self) -> None:
         mock_spi = MagicMock(
-            mode=MCP4161.SPI_MODES[-1],
+            mode=MCP4161.SPI_MODE,
             max_speed=MCP4161.MAX_SPI_MAX_SPEED,
             bit_order=MCP4161.SPI_BIT_ORDER,
             bits_per_word=MCP4161.SPI_WORD_BIT_COUNT,
@@ -21,7 +57,7 @@ class MCP4161TestCase(TestCase):
 
     def test_write_data(self) -> None:
         mock_spi = MagicMock(
-            mode=MCP4161.SPI_MODES[-1],
+            mode=MCP4161.SPI_MODE,
             max_speed=MCP4161.MAX_SPI_MAX_SPEED,
             bit_order=MCP4161.SPI_BIT_ORDER,
             bits_per_word=MCP4161.SPI_WORD_BIT_COUNT,
@@ -35,7 +71,7 @@ class MCP4161TestCase(TestCase):
 
     def test_increment(self) -> None:
         mock_spi = MagicMock(
-            mode=MCP4161.SPI_MODES[-1],
+            mode=MCP4161.SPI_MODE,
             max_speed=MCP4161.MAX_SPI_MAX_SPEED,
             bit_order=MCP4161.SPI_BIT_ORDER,
             bits_per_word=MCP4161.SPI_WORD_BIT_COUNT,
@@ -44,15 +80,15 @@ class MCP4161TestCase(TestCase):
         mock_spi.transfer.return_value = [0b11111111]
         mcp4161 = MCP4161(mock_spi)
 
-        mcp4161.increment(MCP4161.MemoryAddress.VOLATILE_WIPER_0)
+        mcp4161.increment(MemoryAddress.VOLATILE_WIPER_0)
         mock_spi.transfer.assert_called_once_with([0b00000100])
         mock_spi.transfer.reset_mock()
-        mcp4161.increment(MCP4161.MemoryAddress.NON_VOLATILE_WIPER_0)
+        mcp4161.increment(MemoryAddress.NON_VOLATILE_WIPER_0)
         mock_spi.transfer.assert_called_once_with([0b00100100])
 
     def test_decrement(self) -> None:
         mock_spi = MagicMock(
-            mode=MCP4161.SPI_MODES[-1],
+            mode=MCP4161.SPI_MODE,
             max_speed=MCP4161.MAX_SPI_MAX_SPEED,
             bit_order=MCP4161.SPI_BIT_ORDER,
             bits_per_word=MCP4161.SPI_WORD_BIT_COUNT,
@@ -61,8 +97,8 @@ class MCP4161TestCase(TestCase):
         mock_spi.transfer.return_value = [0b11111111]
         mcp4161 = MCP4161(mock_spi)
 
-        mcp4161.decrement(MCP4161.MemoryAddress.VOLATILE_WIPER_0)
+        mcp4161.decrement(MemoryAddress.VOLATILE_WIPER_0)
         mock_spi.transfer.assert_called_once_with([0b00001000])
         mock_spi.transfer.reset_mock()
-        mcp4161.decrement(MCP4161.MemoryAddress.NON_VOLATILE_WIPER_0)
+        mcp4161.decrement(MemoryAddress.NON_VOLATILE_WIPER_0)
         mock_spi.transfer.assert_called_once_with([0b00101000])

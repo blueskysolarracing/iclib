@@ -1,56 +1,128 @@
+from random import random
 from unittest import TestCase
 from unittest.mock import MagicMock
-from typing import ClassVar
 
-from iclib.adc78h89 import ADC78H89
+from iclib.adc78h89 import ADC78H89, InputChannel
 
 
 class ADC78H89TestCase(TestCase):
-    INPUT_CHANNEL_MULTIPLIER: ClassVar[int] = (
-        ADC78H89.DIVISOR // len(tuple(ADC78H89.InputChannel))
-    )
+    VOLTAGES = {
+        input_channel: (
+            0 if input_channel == InputChannel.GROUND else random()
+        ) for input_channel in InputChannel
+    }
+
+    def test_input_channels(self) -> None:
+        table = [
+            [0, 0, 0, 'AIN1'],
+            [0, 0, 1, 'AIN2'],
+            [0, 1, 0, 'AIN3'],
+            [0, 1, 1, 'AIN4'],
+            [1, 0, 0, 'AIN5'],
+            [1, 0, 1, 'AIN6'],
+            [1, 1, 0, 'AIN7'],
+            [1, 1, 1, 'GROUND'],
+        ]
+
+        self.assertEqual(
+            table,
+            [
+                [
+                    InputChannel.AIN1.ADD2,
+                    InputChannel.AIN1.ADD1,
+                    InputChannel.AIN1.ADD0,
+                    InputChannel.AIN1.name,
+                ],
+                [
+                    InputChannel.AIN2.ADD2,
+                    InputChannel.AIN2.ADD1,
+                    InputChannel.AIN2.ADD0,
+                    InputChannel.AIN2.name,
+                ],
+                [
+                    InputChannel.AIN3.ADD2,
+                    InputChannel.AIN3.ADD1,
+                    InputChannel.AIN3.ADD0,
+                    InputChannel.AIN3.name,
+                ],
+                [
+                    InputChannel.AIN4.ADD2,
+                    InputChannel.AIN4.ADD1,
+                    InputChannel.AIN4.ADD0,
+                    InputChannel.AIN4.name,
+                ],
+                [
+                    InputChannel.AIN5.ADD2,
+                    InputChannel.AIN5.ADD1,
+                    InputChannel.AIN5.ADD0,
+                    InputChannel.AIN5.name,
+                ],
+                [
+                    InputChannel.AIN6.ADD2,
+                    InputChannel.AIN6.ADD1,
+                    InputChannel.AIN6.ADD0,
+                    InputChannel.AIN6.name,
+                ],
+                [
+                    InputChannel.AIN7.ADD2,
+                    InputChannel.AIN7.ADD1,
+                    InputChannel.AIN7.ADD0,
+                    InputChannel.AIN7.name,
+                ],
+                [
+                    InputChannel.GROUND.ADD2,
+                    InputChannel.GROUND.ADD1,
+                    InputChannel.GROUND.ADD0,
+                    InputChannel.GROUND.name,
+                ],
+            ],
+        )
 
     def test_sample_all(self) -> None:
         previous_input_channel = ADC78H89.DEFAULT_INPUT_CHANNEL
 
-        def mock_sampling(input_channel: ADC78H89.InputChannel) -> int:
+        def mock_sample(input_channel: InputChannel) -> float:
             nonlocal previous_input_channel
 
-            if previous_input_channel == ADC78H89.InputChannel.GROUND:
-                voltage = 0
-            else:
-                voltage = (
-                    self.INPUT_CHANNEL_MULTIPLIER * previous_input_channel
-                )
-
+            voltage = self.VOLTAGES[previous_input_channel]
             previous_input_channel = input_channel
 
             return voltage
 
-        def mock_transfer(transmitted_data: list[int]) -> list[int]:
-            self.assertEqual(len(transmitted_data) % 2, 0)
+        def mock_transfer(received_data_bytes: list[int]) -> list[int]:
+            self.assertEqual(len(received_data_bytes) % 2, 0)
 
-            received_data = []
+            transmitted_data_bytes = []
 
-            for i, datum in enumerate(transmitted_data):
+            for i, data_byte in enumerate(received_data_bytes):
                 if i % 2 == 0:
-                    voltage = mock_sampling(ADC78H89.InputChannel(datum >> 3))
-
-                    received_data.append(
-                        voltage >> ADC78H89.SPI_WORD_BIT_COUNT,
+                    voltage = mock_sample(InputChannel(data_byte >> 3))
+                    data = round(
+                        (
+                            voltage
+                            / ADC78H89.REFERENCE_VOLTAGE
+                            * ADC78H89.DIVISOR
+                        ),
                     )
-                    received_data.append(
-                        voltage & ((1 << ADC78H89.SPI_WORD_BIT_COUNT) - 1),
+
+                    transmitted_data_bytes.append(
+                        data >> ADC78H89.SPI_WORD_BIT_COUNT,
+                    )
+                    transmitted_data_bytes.append(
+                        data & ((1 << ADC78H89.SPI_WORD_BIT_COUNT) - 1),
                     )
                 else:
-                    self.assertEqual(datum, 0)
+                    self.assertEqual(data_byte, 0)
 
-            self.assertEqual(len(transmitted_data), len(received_data))
+            self.assertEqual(
+                len(transmitted_data_bytes),
+                len(received_data_bytes),
+            )
 
-            return received_data
+            return transmitted_data_bytes
 
         mock_spi = MagicMock(
-            mode=ADC78H89.SPI_MODES[-1],
+            mode=ADC78H89.SPI_MODE,
             max_speed=ADC78H89.MIN_SPI_MAX_SPEED,
             bit_order=ADC78H89.SPI_BIT_ORDER,
             bits_per_word=ADC78H89.SPI_WORD_BIT_COUNT,
@@ -60,18 +132,8 @@ class ADC78H89TestCase(TestCase):
         adc78h89 = ADC78H89(mock_spi)
         voltages = adc78h89.sample_all()
 
-        self.assertEqual(len(voltages), len(tuple(ADC78H89.InputChannel)))
+        self.assertEqual(len(voltages), len(tuple(InputChannel)))
 
         for key, value in voltages.items():
-            self.assertIn(key, ADC78H89.InputChannel)
-
-            if key == ADC78H89.InputChannel.GROUND:
-                self.assertEqual(value, 0)
-            else:
-                self.assertAlmostEqual(
-                    value,
-                    ADC78H89.REFERENCE_VOLTAGE
-                    * self.INPUT_CHANNEL_MULTIPLIER
-                    * key
-                    / ADC78H89.DIVISOR,
-                )
+            self.assertIn(key, InputChannel)
+            self.assertAlmostEqual(value, self.VOLTAGES[key], 3)

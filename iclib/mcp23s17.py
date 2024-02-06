@@ -1,11 +1,210 @@
+"""This module implements the MCP23S17 driver."""
+
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from dataclasses import dataclass
 from enum import auto, Enum, IntEnum
-from typing import cast, ClassVar
+from typing import ClassVar
 from warnings import warn
 
 from periphery import GPIO, SPI
+
+SPI_MODES: tuple[int, int] = 0b00, 0b11
+"""The supported spi modes."""
+MAX_SPI_MAX_SPEED: float = 10e6
+"""The supported maximum spi maximum speed."""
+SPI_BIT_ORDER: str = 'msb'
+"""The supported spi bit order."""
+SPI_WORD_BIT_COUNT: int = 8
+"""The supported spi number of bits per word."""
+
+
+class Port(Enum):
+    """The enum class for ports."""
+
+    PORTA = auto()
+    """PORTA."""
+    PORTB = auto()
+    """PORTB."""
+
+
+class Mode(IntEnum):
+    """The enum class for modes."""
+
+    SIXTEEN_BIT_MODE = auto()
+    """16-bit mode."""
+    EIGHT_BIT_MODE = auto()
+    """8-bit mode."""
+
+
+class RegisterBit(Enum):
+    IODIR = 0x00
+    IODIR_IO0 = 0x00, 0
+    IODIR_IO1 = 0x00, 1
+    IODIR_IO2 = 0x00, 2
+    IODIR_IO3 = 0x00, 3
+    IODIR_IO4 = 0x00, 4
+    IODIR_IO5 = 0x00, 5
+    IODIR_IO6 = 0x00, 6
+    IODIR_IO7 = 0x00, 7
+
+    IPOL = 0x01
+    IPOL_IP0 = 0x01, 0
+    IPOL_IP1 = 0x01, 1
+    IPOL_IP2 = 0x01, 2
+    IPOL_IP3 = 0x01, 3
+    IPOL_IP4 = 0x01, 4
+    IPOL_IP5 = 0x01, 5
+    IPOL_IP6 = 0x01, 6
+    IPOL_IP7 = 0x01, 7
+
+    GPINTEN = 0x02
+    GPINTEN_GPINT0 = 0x02, 0
+    GPINTEN_GPINT1 = 0x02, 1
+    GPINTEN_GPINT2 = 0x02, 2
+    GPINTEN_GPINT3 = 0x02, 3
+    GPINTEN_GPINT4 = 0x02, 4
+    GPINTEN_GPINT5 = 0x02, 5
+    GPINTEN_GPINT6 = 0x02, 6
+    GPINTEN_GPINT7 = 0x02, 7
+
+    DEFVAL = 0x03
+    DEFVAL_DEF0 = 0x03, 0
+    DEFVAL_DEF1 = 0x03, 1
+    DEFVAL_DEF2 = 0x03, 2
+    DEFVAL_DEF3 = 0x03, 3
+    DEFVAL_DEF4 = 0x03, 4
+    DEFVAL_DEF5 = 0x03, 5
+    DEFVAL_DEF6 = 0x03, 6
+    DEFVAL_DEF7 = 0x03, 7
+
+    INTCON = 0x04
+    INTCON_IOC0 = 0x04, 0
+    INTCON_IOC1 = 0x04, 1
+    INTCON_IOC2 = 0x04, 2
+    INTCON_IOC3 = 0x04, 3
+    INTCON_IOC4 = 0x04, 4
+    INTCON_IOC5 = 0x04, 5
+    INTCON_IOC6 = 0x04, 6
+    INTCON_IOC7 = 0x04, 7
+
+    IOCON = 0x05
+    IOCON_UNIMPLEMENTED = 0x05, 0
+    IOCON_INTPOL = 0x05, 1
+    IOCON_ODR = 0x05, 2
+    IOCON_HAEN = 0x05, 3
+    IOCON_DISSLW = 0x05, 4
+    IOCON_SEQOP = 0x05, 5
+    IOCON_MIRROR = 0x05, 6
+    IOCON_BANK = 0x05, 7
+
+    GPPU = 0x06
+    GPPU_PU0 = 0x06, 0
+    GPPU_PU1 = 0x06, 1
+    GPPU_PU2 = 0x06, 2
+    GPPU_PU3 = 0x06, 3
+    GPPU_PU4 = 0x06, 4
+    GPPU_PU5 = 0x06, 5
+    GPPU_PU6 = 0x06, 6
+    GPPU_PU7 = 0x06, 7
+
+    INTF = 0x07
+    INTF_INT0 = 0x07, 0
+    INTF_INT1 = 0x07, 1
+    INTF_INT2 = 0x07, 2
+    INTF_INT3 = 0x07, 3
+    INTF_INT4 = 0x07, 4
+    INTF_INT5 = 0x07, 5
+    INTF_INT6 = 0x07, 6
+    INTF_INT7 = 0x07, 7
+
+    INTCAP = 0x08
+    INTCAP_ICP0 = 0x08, 0
+    INTCAP_ICP1 = 0x08, 1
+    INTCAP_ICP2 = 0x08, 2
+    INTCAP_ICP3 = 0x08, 3
+    INTCAP_ICP4 = 0x08, 4
+    INTCAP_ICP5 = 0x08, 5
+    INTCAP_ICP6 = 0x08, 6
+    INTCAP_ICP7 = 0x08, 7
+
+    GPIO = 0x09
+    GPIO_GP0 = 0x09, 0
+    GPIO_GP1 = 0x09, 1
+    GPIO_GP2 = 0x09, 2
+    GPIO_GP3 = 0x09, 3
+    GPIO_GP4 = 0x09, 4
+    GPIO_GP5 = 0x09, 5
+    GPIO_GP6 = 0x09, 6
+    GPIO_GP7 = 0x09, 7
+
+    OLAT = 0x0A
+    OLAT_OL0 = 0x0A, 0
+    OLAT_OL1 = 0x0A, 1
+    OLAT_OL2 = 0x0A, 2
+    OLAT_OL3 = 0x0A, 3
+    OLAT_OL4 = 0x0A, 4
+    OLAT_OL5 = 0x0A, 5
+    OLAT_OL6 = 0x0A, 6
+    OLAT_OL7 = 0x0A, 7
+
+
+@dataclass
+class Operation(ABC):
+    READ_OR_WRITE_BIT: ClassVar[int]
+    hardware_address: int
+    register_address: int
+
+    @property
+    def control_byte(self) -> int:
+        return (
+            (0b0100 << 4)
+            | (self.hardware_address << 1)
+            | self.READ_OR_WRITE_BIT
+        )
+
+    @property
+    @abstractmethod
+    def data_bytes(self) -> list[int]:
+        pass
+
+    @property
+    @abstractmethod
+    def data_byte_count(self) -> int:
+        pass
+
+    @property
+    def transmitted_data_bytes(self) -> list[int]:
+        return [self.control_byte, self.register_address, *self.data_bytes]
+
+    @property
+    def transmitted_data_byte_count(self) -> int:
+        return 2 + self.data_byte_count
+
+    def parse_received_data_bytes(
+            self,
+            data_bytes: list[int],
+    ) -> list[int]:
+        return data_bytes[-self.data_byte_count:]
+
+
+@dataclass
+class Read(Operation):
+    READ_OR_WRITE_BIT: ClassVar[int] = 1
+    data_byte_count: int
+
+    @property
+    def data_bytes(self) -> list[int]:
+        return [(1 << SPI_WORD_BIT_COUNT) - 1] * self.data_byte_count
+
+
+@dataclass
+class Write(Operation):
+    READ_OR_WRITE_BIT: ClassVar[int] = 0
+    data_bytes: list[int]
+
+    @property
+    def data_byte_count(self) -> int:
+        return len(self.data_bytes)
 
 
 @dataclass
@@ -14,255 +213,6 @@ class MCP23S17:
     Expander with Serial Interface
     """
 
-    class Port(IntEnum):
-        """The enum class for ports."""
-
-        PORTA = auto()
-        """PORTA."""
-        PORTB = auto()
-        """PORTB."""
-
-    class Mode(IntEnum):
-        """The enum class for modes."""
-
-        EIGHT_BIT_MODE = auto()
-        """8-bit mode."""
-        SIXTEEN_BIT_MODE = auto()
-        """16-bit mode."""
-
-    class Register(Enum):
-        _ignore_ = '_Register'
-
-        class _Register(ABC):
-            BITS: ClassVar[type[IntEnum]]
-            ADDRESS: ClassVar[int]
-
-        class IODIR(_Register):
-            class IO(IntEnum):
-                IO0 = 0
-                IO1 = 1
-                IO2 = 2
-                IO3 = 3
-                IO4 = 4
-                IO5 = 5
-                IO6 = 6
-                IO7 = 7
-
-            BITS = IO
-            ADDRESS: ClassVar[int] = 0x00
-
-        class IPOL(_Register):
-            class IP(IntEnum):
-                IP0 = 0
-                IP1 = 1
-                IP2 = 2
-                IP3 = 3
-                IP4 = 4
-                IP5 = 5
-                IP6 = 6
-                IP7 = 7
-
-            BITS = IP
-            ADDRESS: ClassVar[int] = 0x01
-
-        class GPINTEN(_Register):
-            class GPINT(IntEnum):
-                GPINT0 = 0
-                GPINT1 = 1
-                GPINT2 = 2
-                GPINT3 = 3
-                GPINT4 = 4
-                GPINT5 = 5
-                GPINT6 = 6
-                GPINT7 = 7
-
-            BITS = GPINT
-            ADDRESS: ClassVar[int] = 0x02
-
-        class DEFVAL(_Register):
-            class DEF(IntEnum):
-                DEF0 = 0
-                DEF1 = 1
-                DEF2 = 2
-                DEF3 = 3
-                DEF4 = 4
-                DEF5 = 5
-                DEF6 = 6
-                DEF7 = 7
-
-            BITS = DEF
-            ADDRESS: ClassVar[int] = 0x03
-
-        class INTCON(_Register):
-            class IOC(IntEnum):
-                IOC0 = 0
-                IOC1 = 1
-                IOC2 = 2
-                IOC3 = 3
-                IOC4 = 4
-                IOC5 = 5
-                IOC6 = 6
-                IOC7 = 7
-
-            BITS = IOC
-            ADDRESS: ClassVar[int] = 0x04
-
-        class IOCON(_Register):
-            class BITS(IntEnum):
-                UNIMPLEMENTED = 0
-                INTPOL = 1
-                ODR = 2
-                HAEN = 3
-                DISSLW = 4
-                SEQOP = 5
-                MIRROR = 6
-                BANK = 7
-
-            ADDRESS: ClassVar[int] = 0x05
-
-        class GPPU(_Register):
-            class PU(IntEnum):
-                PU0 = 0
-                PU1 = 1
-                PU2 = 2
-                PU3 = 3
-                PU4 = 4
-                PU5 = 5
-                PU6 = 6
-                PU7 = 7
-
-            BITS = PU
-            ADDRESS: ClassVar[int] = 0x06
-
-        class INTF(_Register):
-            class INT(IntEnum):
-                INT0 = 0
-                INT1 = 1
-                INT2 = 2
-                INT3 = 3
-                INT4 = 4
-                INT5 = 5
-                INT6 = 6
-                INT7 = 7
-
-            BITS = INT
-            ADDRESS: ClassVar[int] = 0x07
-
-        class INTCAP(_Register):
-            class ICP(IntEnum):
-                ICP0 = 0
-                ICP1 = 1
-                ICP2 = 2
-                ICP3 = 3
-                ICP4 = 4
-                ICP5 = 5
-                ICP6 = 6
-                ICP7 = 7
-
-            BITS = ICP
-            ADDRESS: ClassVar[int] = 0x08
-
-        class GPIO(_Register):
-            class GP(IntEnum):
-                GP0 = 0
-                GP1 = 1
-                GP2 = 2
-                GP3 = 3
-                GP4 = 4
-                GP5 = 5
-                GP6 = 6
-                GP7 = 7
-
-            BITS = GP
-            ADDRESS: ClassVar[int] = 0x09
-
-        class OLAT(_Register):
-            class OL(IntEnum):
-                OL0 = 0
-                OL1 = 1
-                OL2 = 2
-                OL3 = 3
-                OL4 = 4
-                OL5 = 5
-                OL6 = 6
-                OL7 = 7
-
-            BITS = OL
-            ADDRESS: ClassVar[int] = 0x0A
-
-        @property
-        def bits(self) -> type[IntEnum]:
-            return cast(type[IntEnum], self.value.BITS)
-
-        @property
-        def address(self) -> int:
-            return cast(int, self.value.ADDRESS)
-
-    @dataclass
-    class Operation(ABC):
-        READ_OR_WRITE_BIT: ClassVar[int]
-        hardware_address: int
-        register_address: int
-
-        @property
-        def control_byte(self) -> int:
-            return (
-                (MCP23S17.FIXED_BITS << MCP23S17.FIXED_BITS_OFFSET)
-                | (self.hardware_address << MCP23S17.CLIENT_ADDRESS_OFFSET)
-                | (self.READ_OR_WRITE_BIT << MCP23S17.READ_OR_WRITE_BIT_OFFSET)
-            )
-
-        @property
-        @abstractmethod
-        def data_bytes(self) -> list[int]:
-            pass
-
-        @property
-        def transmitted_data(self) -> list[int]:
-            return [self.control_byte, self.register_address, *self.data_bytes]
-
-        @abstractmethod
-        def parse(self, received_data: list[int]) -> list[int] | None:
-            pass
-
-    @dataclass
-    class Read(Operation):
-        READ_OR_WRITE_BIT: ClassVar[int] = 1
-        data_byte_count: int
-
-        @property
-        def data_bytes(self) -> list[int]:
-            return (
-                [(1 << MCP23S17.SPI_WORD_BIT_COUNT) - 1] * self.data_byte_count
-            )
-
-        def parse(self, received_data: list[int]) -> list[int]:
-            return received_data[-self.data_byte_count:]
-
-    @dataclass
-    class Write(Operation):
-        READ_OR_WRITE_BIT: ClassVar[int] = 0
-        data_bytes: list[int]
-
-        def parse(self, received_data: list[int]) -> None:
-            return None
-
-    SPI_MODES: ClassVar[tuple[int, int]] = 0b00, 0b11
-    """The supported spi modes."""
-    MAX_SPI_MAX_SPEED: ClassVar[float] = 10e6
-    """The supported maximum spi maximum speed."""
-    SPI_BIT_ORDER: ClassVar[str] = 'msb'
-    """The supported spi bit order."""
-    SPI_WORD_BIT_COUNT: ClassVar[int] = 8
-    """The supported spi number of bits per word."""
-    FIXED_BITS: ClassVar[int] = 0b0100
-    """The four fixed bits."""
-    FIXED_BITS_OFFSET: ClassVar[int] = 4
-    """The fixed-bits offset."""
-    CLIENT_ADDRESS_OFFSET: ClassVar[int] = 1
-    """The client address offset."""
-    READ_OR_WRITE_BIT_OFFSET: ClassVar[int] = 0
-    """The R/W bit offset."""
     hardware_reset_gpio: GPIO
     """The hardware reset GPIO."""
     interrupt_output_a_gpio: GPIO
@@ -271,40 +221,73 @@ class MCP23S17:
     """The interrupt output for PORTB GPIO."""
     spi: SPI
     """The SPI."""
-    callback: Callable[[Port], None]
-    """The callback function."""
+    hardware_address: int = 0
+    """The hardware address."""
+    # callback: Callable[[Port], None]
+    # """The callback function."""
 
     def __post_init__(self) -> None:
-        if self.spi.mode not in self.SPI_MODES:
+        if self.spi.mode not in SPI_MODES:
             raise ValueError('unsupported spi mode')
-        elif self.spi.max_speed > self.MAX_SPI_MAX_SPEED:
+        elif self.spi.max_speed > MAX_SPI_MAX_SPEED:
             raise ValueError('unsupported spi maximum speed')
-        elif self.spi.bit_order != self.SPI_BIT_ORDER:
+        elif self.spi.bit_order != SPI_BIT_ORDER:
             raise ValueError('unsupported spi bit order')
-        elif self.spi.bits_per_word != self.SPI_WORD_BIT_COUNT:
+        elif self.spi.bits_per_word != SPI_WORD_BIT_COUNT:
             raise ValueError('unsupported spi number of bits per word')
 
         if self.spi.extra_flags:
             warn(f'unknown spi extra flags {self.spi.extra_flags}')
 
-    def operate(self, *operations: Operation) -> list[list[int] | None]:
-        transmitted_data = []
+    def operate(self, *operations: Operation) -> list[int]:
+        transmitted_data_bytes = []
 
         for operation in operations:
-            transmitted_data.extend(operation.transmitted_data)
+            transmitted_data_bytes.extend(operation.transmitted_data_bytes)
 
-        received_data = self.spi.transfer(transmitted_data)
+        received_data_bytes = self.spi.transfer(transmitted_data_bytes)
 
-        assert isinstance(received_data, list)
+        assert isinstance(received_data_bytes, list)
 
-        parsed_data = []
+        parsed_received_data_bytes = []
         begin = 0
 
         for operation in operations:
-            end = begin + len(operation.transmitted_data)
+            end = begin + operation.transmitted_data_byte_count
 
-            parsed_data.append(operation.parse(received_data[begin:end]))
+            parsed_received_data_bytes.extend(
+                operation.parse_received_data_bytes(
+                    received_data_bytes[begin:end],
+                ),
+            )
 
             begin = end
 
-        return parsed_data
+        return parsed_received_data_bytes
+
+    def read_raw(
+            self,
+            register_address: int,
+            data_byte_count: int,
+    ) -> list[int]:
+        return self.operate(
+            Read(self.hardware_address, register_address, data_byte_count),
+        )
+
+    def write_raw(
+            self,
+            register_address: int,
+            data_bytes: list[int],
+    ) -> list[int]:
+        return self.operate(
+            Write(self.hardware_address, register_address, data_bytes),
+        )
+
+    def read(
+            self,
+            port: Port,
+            register: int,
+            data_byte_count: int = 1,
+    ) -> list[int]:
+        register_address = 0  # TODO
+        return self.read_raw(register_address, data_byte_count)

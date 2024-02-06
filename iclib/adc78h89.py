@@ -1,3 +1,5 @@
+"""This module implements the ADC78H89 driver."""
+
 from collections import deque
 from dataclasses import dataclass
 from enum import IntEnum
@@ -7,34 +9,62 @@ from warnings import warn
 from periphery import SPI
 
 
+class InputChannel(IntEnum):
+    """The enum class for input channels.
+
+    Refer to Table 3, ADC78H89 Datasheet, Page 13.
+    """
+
+    AIN1: int = 0b000
+    """The first (default) input channel."""
+    AIN2: int = 0b001
+    """The second input channel."""
+    AIN3: int = 0b010
+    """The third input channel."""
+    AIN4: int = 0b011
+    """The fourth input channel."""
+    AIN5: int = 0b100
+    """The fifth input channel."""
+    AIN6: int = 0b101
+    """The fifth input channel."""
+    AIN7: int = 0b110
+    """The seventh input channel."""
+    GROUND: int = 0b111
+    """The ground input channel."""
+
+    @property
+    def ADD2(self) -> bool:
+        """Get ``ADD2`` of the input channel.
+
+        :return: ``ADD2``.
+        """
+        return bool(self & 0b100)
+
+    @property
+    def ADD1(self) -> bool:
+        """Get ``ADD1`` of the input channel.
+
+        :return: ``ADD1``.
+        """
+        return bool(self & 0b010)
+
+    @property
+    def ADD0(self) -> bool:
+        """Get ``ADD0`` of the input channel.
+
+        :return: ``ADD0``.
+        """
+        return bool(self & 0b001)
+
+
 @dataclass
 class ADC78H89:
     """The class for Texas Instruments ADC78H89 7-Channel, 500 KSPS,
     12-Bit A/D Converter.
     """
 
-    class InputChannel(IntEnum):
-        """The enum class for input channels."""
-
-        AIN1: int = 0b000
-        """The first (default) input channel."""
-        AIN2: int = 0b001
-        """The second input channel."""
-        AIN3: int = 0b010
-        """The third input channel."""
-        AIN4: int = 0b011
-        """The fourth input channel."""
-        AIN5: int = 0b100
-        """The fifth input channel."""
-        AIN6: int = 0b101
-        """The fifth input channel."""
-        AIN7: int = 0b110
-        """The seventh input channel."""
-        GROUND: int = 0b111
-        """The ground input channel."""
-
-    SPI_MODES: ClassVar[tuple[int, int]] = 0b00, 0b11
-    """The supported spi modes."""
+    SPI_MODE: ClassVar[int] = 0b11
+    """The supported spi mode."""
     MIN_SPI_MAX_SPEED: ClassVar[float] = 5e4
     """The supported minimum spi maximum speed."""
     MAX_SPI_MAX_SPEED: ClassVar[float] = 8e6
@@ -55,7 +85,7 @@ class ADC78H89:
     """The SPI for the ADC device."""
 
     def __post_init__(self) -> None:
-        if self.spi.mode not in self.SPI_MODES:
+        if self.spi.mode != self.SPI_MODE:
             raise ValueError('unsupported spi mode')
         elif not (
                 self.MIN_SPI_MAX_SPEED
@@ -77,25 +107,27 @@ class ADC78H89:
         :param input_channels: The input channels.
         :return: The sampled voltages.
         """
-        transmitted_data = []
+        transmitted_data_bytes = []
 
         for input_channel in input_channels:
-            transmitted_data.append(
+            transmitted_data_bytes.append(
                 input_channel << self.INPUT_CHANNEL_BITS_OFFSET,
             )
-            transmitted_data.append(0)
+            transmitted_data_bytes.append(0)
 
-        received_data = self.spi.transfer(transmitted_data)
+        received_data_bytes = self.spi.transfer(transmitted_data_bytes)
         voltages = []
 
-        for i in range(0, len(received_data), 2):
-            raw_data = (
-                received_data[i]
+        for i in range(0, len(received_data_bytes), 2):
+            data_byte = (
+                received_data_bytes[i]
                 << self.SPI_WORD_BIT_COUNT
-                | received_data[i + 1]
+                | received_data_bytes[i + 1]
             )
 
-            voltages.append(self.REFERENCE_VOLTAGE * raw_data / self.DIVISOR)
+            voltages.append(
+                self.REFERENCE_VOLTAGE * data_byte / self.DIVISOR,
+            )
 
         return voltages
 
@@ -104,10 +136,10 @@ class ADC78H89:
 
         :return: The sampled voltages.
         """
-        self.sample(self.InputChannel.GROUND)
+        self.sample(InputChannel.GROUND)
 
-        voltages = deque(self.sample(*self.InputChannel))
+        voltages = deque(self.sample(*InputChannel))
 
         voltages.rotate(-1)
 
-        return dict(zip(self.InputChannel, voltages))
+        return dict(zip(InputChannel, voltages))
