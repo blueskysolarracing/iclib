@@ -26,7 +26,7 @@ class InputChannel(IntEnum):
     AIN5: int = 0b100
     """The fifth input channel."""
     AIN6: int = 0b101
-    """The fifth input channel."""
+    """The sixth input channel."""
     AIN7: int = 0b110
     """The seventh input channel."""
     GROUND: int = 0b111
@@ -75,14 +75,14 @@ class ADC78H89:
     """The supported spi number of bits per word."""
     INPUT_CHANNEL_BITS_OFFSET: ClassVar[int] = 3
     """The input channel bits offset for control register bits."""
-    REFERENCE_VOLTAGE: ClassVar[float] = 3.3
-    """The reference voltage value (in volts)."""
     DIVISOR: ClassVar[int] = 4096
     """The lsb width for ADC78H89."""
     DEFAULT_INPUT_CHANNEL: ClassVar[InputChannel] = InputChannel(0)
     """The default input channel."""
     spi: SPI
     """The SPI for the ADC device."""
+    reference_voltage: float
+    """The reference voltage value (in volts)."""
 
     def __post_init__(self) -> None:
         if self.spi.mode != self.SPI_MODE:
@@ -126,7 +126,7 @@ class ADC78H89:
             )
 
             voltages.append(
-                self.REFERENCE_VOLTAGE * data_byte / self.DIVISOR,
+                self.reference_voltage * data_byte / self.DIVISOR,
             )
 
         return voltages

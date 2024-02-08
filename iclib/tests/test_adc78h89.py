@@ -1,4 +1,5 @@
 from random import random
+from typing import ClassVar
 from unittest import TestCase
 from unittest.mock import MagicMock
 
@@ -6,11 +7,12 @@ from iclib.adc78h89 import ADC78H89, InputChannel
 
 
 class ADC78H89TestCase(TestCase):
-    VOLTAGES = {
+    VOLTAGES: ClassVar[dict[InputChannel, float]] = {
         input_channel: (
             0 if input_channel == InputChannel.GROUND else random()
         ) for input_channel in InputChannel
     }
+    REFERENCE_VOLTAGE: ClassVar[float] = 3.3
 
     def test_input_channels(self) -> None:
         table = [
@@ -100,7 +102,7 @@ class ADC78H89TestCase(TestCase):
                     data = round(
                         (
                             voltage
-                            / ADC78H89.REFERENCE_VOLTAGE
+                            / self.REFERENCE_VOLTAGE
                             * ADC78H89.DIVISOR
                         ),
                     )
@@ -129,7 +131,7 @@ class ADC78H89TestCase(TestCase):
             extra_flags=0,
         )
         mock_spi.transfer = mock_transfer
-        adc78h89 = ADC78H89(mock_spi)
+        adc78h89 = ADC78H89(mock_spi, self.REFERENCE_VOLTAGE)
         voltages = adc78h89.sample_all()
 
         self.assertEqual(len(voltages), len(tuple(InputChannel)))
