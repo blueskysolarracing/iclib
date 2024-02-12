@@ -78,9 +78,10 @@ Below shows a sample usage of NHD-C12864A1Z-FSW-FBW-HTT.
 
 .. code-block:: python
 
-   from nhd-c12864a1z-fsw-fbw-htt import NHDC12864A1ZFSWFBWHTT 
-   from periphery import SPI, GPIO
-   import time
+   from time import sleep
+
+   from periphery import GPIO, SPI
+   from iclib.nhd_c12864a1z_fsw_fbw_htt import NHDC12864A1ZFSWFBWHTT 
 
    spi = SPI('/dev/spidev0.0', 3, 10e6)
    a0 = GPIO('/dev/gpiochip0', 8, 'out')
@@ -99,7 +100,7 @@ Below shows a sample usage of NHD-C12864A1Z-FSW-FBW-HTT.
    display.draw_word("@#$%*^", 1, int(driver.HEIGHT*0.7))
    display.display()
 
-   time.sleep(5)
+   sleep(5)
 
    display.clear_screen()
 
