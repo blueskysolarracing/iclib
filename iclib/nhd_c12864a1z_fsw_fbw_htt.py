@@ -98,7 +98,7 @@ class NHDC12864A1ZFSWFBWHTT:
                 0x2F,              # Power Control set.
                 0x26,              # Resistor Ratio Set.
                 0x81,              # Electronic Volume Command (set contrast).
-                0x11               # Electronic Volume value (contrast value).
+                0x11,              # Electronic Volume value (contrast value).
             ]
         )
         self.spi.transfer([self.DISPLAY_ON])  # Display ON.
@@ -138,6 +138,7 @@ class NHDC12864A1ZFSWFBWHTT:
             self.a0_pin.write(False)
             page += 1
             index += 1
+
         self.spi.transfer(
             [
                 self.DISPLAY_ON,
