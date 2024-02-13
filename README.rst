@@ -93,11 +93,11 @@ Below shows a sample usage of NHD-C12864A1Z-FSW-FBW-HTT.
 
    display.draw_rect(0, 0, 127, 63)
 
-   display.set_font("dejavusans.ttf")
+   display.set_font('dejavusans.ttf')
    display.set_size(8, 14)
-   display.draw_word("Welcome to Blue Sky solar racing! 12345678910", 2, 2)
+   display.draw_word('Welcome to Blue Sky solar racing! 12345678910', 2, 2)
    display.set_size(16, 16)
-   display.draw_word("@#$%*^", 1, int(driver.HEIGHT*0.7))
+   display.draw_word('@#$%*^', 1, int(driver.HEIGHT * 0.7))
    display.display()
 
    sleep(5)
@@ -108,12 +108,13 @@ Below shows a sample usage of NHD-C12864A1Z-FSW-FBW-HTT.
     for row in range(display.HEIGHT)
         for col in range(display.WIDTH)
             display.write_pixel(col, row)
+
     display.display()
 
     # Create checkerboard pattern
     for row in range(display.HEIGHT)
         for col in range(display.WIDTH)
-            if (row + col) % 2 == 1: # Checker pattern
+            if (row + col) % 2 == 1:  # Checker pattern
                 display.clear_pixel(col, row)
 
 Testing and Validation
