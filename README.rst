@@ -75,6 +75,49 @@ Below shows a sample usage of SN74HCS137.
    sleep(1)
    sn78hcs137.deselect()
 
+Below shows a sample usage of NHD-C12864A1Z-FSW-FBW-HTT.
+
+.. code-block:: python
+
+   from time import sleep
+
+   from periphery import GPIO, SPI
+   from iclib.nhd_c12864a1z_fsw_fbw_htt import NHDC12864A1ZFSWFBWHTT 
+
+   spi = SPI('/dev/spidev0.0', 3, 10e6)
+   a0 = GPIO('/dev/gpiochip0', 8, 'out')
+   not_reset = GPIO('/dev/gpiochip0', 9, 'out')
+   display = NHDC12864A1ZFSWFBWHTT(spi, a0, not_reset)
+
+   display.configure()
+   display.clear_screen()
+
+   display.draw_rect(0, 0, 127, 63)
+
+   display.set_font('dejavusans.ttf')
+   display.set_size(8, 14)
+   display.draw_word('Welcome to Blue Sky solar racing! 12345678910', 2, 2)
+   display.set_size(16, 16)
+   display.draw_word('@#$%*^', 1, int(driver.HEIGHT * 0.7))
+   display.display()
+
+   sleep(5)
+
+   display.clear_screen()
+
+    # Fill screen
+    for row in range(display.HEIGHT)
+        for col in range(display.WIDTH)
+            display.write_pixel(col, row)
+
+    display.display()
+
+    # Create checkerboard pattern
+    for row in range(display.HEIGHT)
+        for col in range(display.WIDTH)
+            if (row + col) % 2 == 1:  # Checker pattern
+                display.clear_pixel(col, row)
+
 Testing and Validation
 ----------------------
 
