@@ -1,4 +1,4 @@
-from unittest import TestCase
+from unittest import TestCase, main
 from unittest.mock import MagicMock
 
 from iclib.sn74hcs137 import Address, SN74HCS137
@@ -64,3 +64,7 @@ class SN74HCS137TestCase(TestCase):
         sn74hcs137.deselect()
         strobe_input_0_gpio.write.assert_called_with(False)
         strobe_input_1_gpio.write.assert_called_with(False)
+
+
+if __name__ == '__main__':
+    main()  # pragma: no cover

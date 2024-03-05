@@ -1,22 +1,14 @@
 """This module implements the INA229 driver."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 from typing import ClassVar
 from warnings import warn
 
 from periphery import GPIO, SPI
 
-SPI_MODES: tuple[int, int] = 0b00, 0b11
-"""The supported spi modes."""
-MAX_SPI_MAX_SPEED: float = 10e6
-"""The supported maximum spi maximum speed."""
-SPI_BIT_ORDER: str = 'msb'
-"""The supported spi bit order."""
-SPI_WORD_BIT_COUNT: int = 8
-"""The supported spi number of bits per word."""
+from iclib.utilities import twos_complement
 
 
 class ReadOrWriteType(StrEnum):
@@ -94,7 +86,7 @@ class CONFIGRegisterField(Enum):
 @dataclass
 class SPIFrame(ABC):
     READ_OR_WRITE_TYPE: ClassVar[ReadOrWriteType]
-    register: Register
+    register_: Register  # appended underscore due to weird bug in dataclass
 
     @property
     def read_or_write_bit(self) -> bool:
@@ -102,11 +94,11 @@ class SPIFrame(ABC):
 
     @property
     def control_byte(self) -> int:
-        return (self.register.address << 2) | self.read_or_write_bit
+        return (self.register_.address << 2) | self.read_or_write_bit
 
     @property
     def data_byte_count(self) -> int:
-        return self.register.size // SPI_WORD_BIT_COUNT
+        return self.register_.size // INA229.SPI_WORD_BIT_COUNT
 
     @property
     def transmitted_data_byte_count(self) -> int:
@@ -128,7 +120,7 @@ class SPIFrame(ABC):
         parsed_data = 0
 
         for data_byte in data_bytes[-self.data_byte_count:]:
-            parsed_data <<= SPI_WORD_BIT_COUNT
+            parsed_data <<= INA229.SPI_WORD_BIT_COUNT
             parsed_data |= data_byte
 
         return parsed_data
@@ -149,13 +141,13 @@ class SPIWriteFrame(SPIFrame):
     data: int
 
     def __post_init__(self) -> None:
-        assert self.register.size == 16
+        assert self.register_.size == 16
 
     @property
     def data_bytes(self) -> list[int]:
         return [
-            self.data >> SPI_WORD_BIT_COUNT,
-            self.data & ((1 << SPI_WORD_BIT_COUNT) - 1),
+            self.data >> INA229.SPI_WORD_BIT_COUNT,
+            self.data & ((1 << INA229.SPI_WORD_BIT_COUNT) - 1),
         ]
 
 
@@ -166,23 +158,32 @@ class INA229:
     Expander with Serial Interface.
     """
 
+    SPI_MODE: ClassVar[int] = 0b00
+    """The supported spi modes."""
+    MAX_SPI_MAX_SPEED: ClassVar[float] = 10e6
+    """The supported maximum spi maximum speed."""
+    SPI_BIT_ORDER: ClassVar[str] = 'msb'
+    """The supported spi bit order."""
+    SPI_WORD_BIT_COUNT: ClassVar[int] = 8
+    """The supported spi number of bits per word."""
     R_SHUNT: float
-    """The shunt register."""
+    """The resistance value of the external shunt used to develop the
+    differential voltage across the IN+ and IN- pins."""
     alert_gpio: GPIO
     """The alert GPIO."""
     spi: SPI
     """The SPI."""
-    callback: Callable[[], None]
-    """The callback function."""
+    _ADCRANGE: bool = field(default=False, init=False)
+    _SHUNT_CAL: int = field(default=0x1000, init=False)
 
     def __post_init__(self) -> None:
-        if self.spi.mode not in SPI_MODES:
+        if self.spi.mode != self.SPI_MODE:
             raise ValueError('unsupported spi mode')
-        elif self.spi.max_speed > MAX_SPI_MAX_SPEED:
+        elif self.spi.max_speed > self.MAX_SPI_MAX_SPEED:
             raise ValueError('unsupported spi maximum speed')
-        elif self.spi.bit_order != SPI_BIT_ORDER:
+        elif self.spi.bit_order != self.SPI_BIT_ORDER:
             raise ValueError('unsupported spi bit order')
-        elif self.spi.bits_per_word != SPI_WORD_BIT_COUNT:
+        elif self.spi.bits_per_word != self.SPI_WORD_BIT_COUNT:
             raise ValueError('unsupported spi number of bits per word')
 
         if self.spi.extra_flags:
@@ -238,19 +239,34 @@ class INA229:
         else:
             conversion_factor = 312.5
 
-        return conversion_factor * (self.read(Register.VSHUNT) >> 4) / 1e9
+        return (
+            conversion_factor
+            * twos_complement(self.read(Register.VSHUNT) >> 4, 20)
+            / 1e9
+        )
 
     @property
     def bus_voltage(self) -> float:
-        return 195.3125 * (self.read(Register.VBUS) >> 4) / 1e9
+        return (
+            195.3125
+            * twos_complement(self.read(Register.VBUS) >> 4, 20)
+            / 1e9
+        )
 
     @property
     def temperature(self) -> float:
-        return 7.8125 * self.read(Register.DIETEMP) / 1e3
+        return (
+            7.8125
+            * twos_complement(self.read(Register.DIETEMP), 16)
+            / 1e3
+        )
 
     @property
     def current(self) -> float:
-        return self.CURRENT_LSB * self.read(Register.CURRENT)
+        return (
+            self.CURRENT_LSB
+            * twos_complement(self.read(Register.CURRENT) >> 4, 20)
+        )
 
     @property
     def power(self) -> float:
@@ -262,28 +278,51 @@ class INA229:
 
     @property
     def charge(self) -> float:
-        return self.CURRENT_LSB * self.read(Register.CHARGE)
+        return (
+            self.CURRENT_LSB
+            * twos_complement(self.read(Register.CHARGE), 40)
+        )
 
     # Non-semantic
 
     @property
     def ADCRANGE(self) -> bool:
-        return bool(
-            (
-                self.read(Register.CONFIG)
-                & (1 << CONFIGRegisterField.ADCRANGE.bit)
-            ),
+        assert (
+            self._ADCRANGE
+            == bool(
+                (
+                    self.read(Register.CONFIG)
+                    & (1 << CONFIGRegisterField.ADCRANGE.bit)
+                ),
+            )
         )
+
+        return self._ADCRANGE
+
+    @ADCRANGE.setter
+    def ADCRANGE(self, value: bool) -> None:
+        CONFIG = self.read(Register.CONFIG)
+
+        if bool(CONFIG & (1 << CONFIGRegisterField.ADCRANGE.bit)) != value:
+            CONFIG ^= 1 << CONFIGRegisterField.ADCRANGE.bit
+
+            self.write(Register.CONFIG, CONFIG)
 
     @property
     def SHUNT_CAL(self) -> int:
-        value = self.read(Register.SHUNT_CAL)
+        assert self._SHUNT_CAL == self.read(Register.SHUNT_CAL)
 
-        if self.ADCRANGE:
-            value *= 4
+        return self._SHUNT_CAL
 
-        return value
+    @SHUNT_CAL.setter
+    def SHUNT_CAL(self, value: int) -> None:
+        self.write(Register.SHUNT_CAL, value)
 
     @property
     def CURRENT_LSB(self) -> float:
-        return self.SHUNT_CAL / (13107.2 * 1e6 * self.R_SHUNT)
+        SHUNT_CAL = self.SHUNT_CAL
+
+        if self.ADCRANGE:
+            SHUNT_CAL *= 4
+
+        return SHUNT_CAL / (13107.2 * 1e6 * self.R_SHUNT)

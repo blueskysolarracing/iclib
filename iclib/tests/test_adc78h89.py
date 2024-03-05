@@ -1,6 +1,6 @@
 from random import random
 from typing import ClassVar
-from unittest import TestCase
+from unittest import TestCase, main
 from unittest.mock import MagicMock
 
 from iclib.adc78h89 import ADC78H89, InputChannel
@@ -139,3 +139,7 @@ class ADC78H89TestCase(TestCase):
         for key, value in voltages.items():
             self.assertIn(key, InputChannel)
             self.assertAlmostEqual(value, self.VOLTAGES[key], 3)
+
+
+if __name__ == '__main__':
+    main()  # pragma: no cover

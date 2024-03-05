@@ -28,7 +28,7 @@ class MemoryAddress(IntEnum):
     """The status register."""
 
 
-class STATUSBits(int):
+class STATUSBit(int):
     """The class for STATUS bits."""
 
     EEWA = property(bit_getter(4))
@@ -43,7 +43,7 @@ class STATUSBits(int):
     """Get the WP bit."""
 
 
-class TCONBits(int):
+class TCONBit(int):
     """The class for TCON bits."""
 
     R1HW = property(bit_getter(7))
@@ -103,8 +103,8 @@ class SixteenBitCommand(Command, ABC):
 
 
 @dataclass
-class ReadData(SixteenBitCommand):
-    """The class for read data commands."""
+class Read(SixteenBitCommand):
+    """The class for read commands."""
 
     COMMAND_BITS: ClassVar[int] = 0b11
     READ_DATA_BIT_COUNT: ClassVar[int] = 9
@@ -129,8 +129,8 @@ class ReadData(SixteenBitCommand):
 
 
 @dataclass
-class WriteData(SixteenBitCommand):
-    """The class for read data commands."""
+class Write(SixteenBitCommand):
+    """The class for write commands."""
 
     COMMAND_BITS: ClassVar[int] = 0b00
     data: int
@@ -189,7 +189,7 @@ class MCP4161:
     Single/Dual SPI Digital POT with Non-Volatile Memory
     """
 
-    SPI_MODE: ClassVar[int] = 0b11
+    SPI_MODES: ClassVar[tuple[int, int]] = 0b00, 0b11
     """The supported spi mode."""
     MAX_SPI_MAX_SPEED: ClassVar[float] = 10e6
     """The supported maximum spi maximum speed."""
@@ -203,7 +203,7 @@ class MCP4161:
     """The SPI."""
 
     def __post_init__(self) -> None:
-        if self.spi.mode != self.SPI_MODE:
+        if self.spi.mode not in self.SPI_MODES:
             raise ValueError('unsupported spi mode')
         elif self.spi.max_speed > self.MAX_SPI_MAX_SPEED:
             raise ValueError('unsupported spi maximum speed')
@@ -221,7 +221,7 @@ class MCP4161:
 
         :return: The register value.
         """
-        return self.read_data(MemoryAddress.VOLATILE_WIPER_0)
+        return self.read(MemoryAddress.VOLATILE_WIPER_0)
 
     @VOLATILE_WIPER_0.setter
     def VOLATILE_WIPER_0(self, value: int) -> None:
@@ -230,7 +230,7 @@ class MCP4161:
         :param value: The value.
         :return: ``None``.
         """
-        self.write_data(MemoryAddress.VOLATILE_WIPER_0, value)
+        self.write(MemoryAddress.VOLATILE_WIPER_0, value)
 
     @property
     def NON_VOLATILE_WIPER_0(self) -> int:
@@ -238,7 +238,7 @@ class MCP4161:
 
         :return: The register value.
         """
-        return self.read_data(MemoryAddress.NON_VOLATILE_WIPER_0)
+        return self.read(MemoryAddress.NON_VOLATILE_WIPER_0)
 
     @NON_VOLATILE_WIPER_0.setter
     def NON_VOLATILE_WIPER_0(self, value: int) -> None:
@@ -247,15 +247,15 @@ class MCP4161:
         :param value: The value.
         :return: ``None``.
         """
-        self.write_data(MemoryAddress.NON_VOLATILE_WIPER_0, value)
+        self.write(MemoryAddress.NON_VOLATILE_WIPER_0, value)
 
     @property
-    def VOLATILE_TCON_REGISTER(self) -> TCONBits:
+    def VOLATILE_TCON_REGISTER(self) -> TCONBit:
         """Read the VOLATILE_TCON_REGISTER register.
 
         :return: The register value.
         """
-        return TCONBits(self.read_data(MemoryAddress.VOLATILE_TCON_REGISTER))
+        return TCONBit(self.read(MemoryAddress.VOLATILE_TCON_REGISTER))
 
     @VOLATILE_TCON_REGISTER.setter
     def VOLATILE_TCON_REGISTER(self, value: int) -> None:
@@ -264,15 +264,15 @@ class MCP4161:
         :param value: The value.
         :return: ``None``.
         """
-        self.write_data(MemoryAddress.VOLATILE_TCON_REGISTER, value)
+        self.write(MemoryAddress.VOLATILE_TCON_REGISTER, value)
 
     @property
-    def STATUS_REGISTER(self) -> STATUSBits:
+    def STATUS_REGISTER(self) -> STATUSBit:
         """Read the STATUS_REGISTER register.
 
         :return: The register value.
         """
-        return STATUSBits(self.read_data(MemoryAddress.STATUS_REGISTER))
+        return STATUSBit(self.read(MemoryAddress.STATUS_REGISTER))
 
     @STATUS_REGISTER.setter
     def STATUS_REGISTER(self, value: int) -> None:
@@ -281,7 +281,7 @@ class MCP4161:
         :param value: The value.
         :return: ``None``.
         """
-        self.write_data(MemoryAddress.STATUS_REGISTER, value)
+        self.write(MemoryAddress.STATUS_REGISTER, value)
 
     def command(self, *commands: Command) -> list[int | None]:
         """Apply the commands.
@@ -314,26 +314,26 @@ class MCP4161:
 
         return parsed_data_bytes
 
-    def read_data(self, memory_address: int) -> int:
+    def read(self, memory_address: int) -> int:
         """Read the data at the memory address.
 
         :param memory_address: The memory address.
         :return: The read data.
         """
-        datum = self.command(ReadData(memory_address))[0]
+        datum = self.command(Read(memory_address))[0]
 
         assert datum is not None
 
         return datum
 
-    def write_data(self, memory_address: int, data: int) -> None:
+    def write(self, memory_address: int, data: int) -> None:
         """Write the data at the memory address.
 
         :param memory_address: The memory address.
         :param data: The data.
         :return: ``None``.
         """
-        self.command(WriteData(memory_address, data))
+        self.command(Write(memory_address, data))
 
     def increment(self, memory_address: int) -> None:
         """Increment the data at the memory address.
@@ -360,7 +360,7 @@ class MCP4161:
         if step not in self.STEP_RANGE:
             raise ValueError('invalid step')
 
-        self.write_data(MemoryAddress.VOLATILE_WIPER_0, step)
+        self.write(MemoryAddress.VOLATILE_WIPER_0, step)
 
     def set_non_volatile_wiper_step(self, step: int) -> None:
         """Set the non-volatile wiper step.
@@ -371,4 +371,4 @@ class MCP4161:
         if step not in self.STEP_RANGE:
             raise ValueError('invalid step')
 
-        self.write_data(MemoryAddress.NON_VOLATILE_WIPER_0, step)
+        self.write(MemoryAddress.NON_VOLATILE_WIPER_0, step)
