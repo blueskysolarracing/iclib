@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from math import floor
-from time import sleep
 from typing import ClassVar
 from warnings import warn
 
@@ -13,9 +12,6 @@ class NHDC12864A1ZFSWFBWHTT:
     """A Python driver for Newhaven Display Intl
     NHD-C12864A1Z-FSW-FBW-HTT COG (Chip-On-Glass) Liquid Crystal Display
     Module
-
-    TODO: Benchmark sleep() delays between hardware transfers and delete
-          the delay if it is uneeded.
     """
 
     SPI_MODE: ClassVar[int] = 0b11
@@ -27,8 +23,6 @@ class NHDC12864A1ZFSWFBWHTT:
     SPI_BIT_ORDER: ClassVar[str] = 'msb'
     """The supported spi bit order."""
 
-    TIME_DELAY: ClassVar[float] = 0.01
-    """The time in seconds to delay between operations"""
     WIDTH: ClassVar[int] = 128
     """The number of pixels by width."""
     HEIGHT: ClassVar[int] = 64
@@ -79,7 +73,6 @@ class NHDC12864A1ZFSWFBWHTT:
         :return: ``None``.
         """
         self.reset_pin.write(False)
-        sleep(self.TIME_DELAY)
         self.reset_pin.write(True)
 
     def configure(self) -> None:
@@ -127,14 +120,12 @@ class NHDC12864A1ZFSWFBWHTT:
         for i in range(8):
             self.spi.transfer([page, 0x10, 0x00])
             self.a0_pin.write(True)
-            sleep(self.TIME_DELAY)
             self.spi.transfer(
                 [
                     self.framebuffer[i + index * self.WIDTH]
                     for i in range(self.WIDTH)
                 ],
             )
-            sleep(self.TIME_DELAY)
             self.a0_pin.write(False)
             page += 1
             index += 1
@@ -190,9 +181,7 @@ class NHDC12864A1ZFSWFBWHTT:
 
         self.spi.transfer([page, 0x10, 0x00])
         self.a0_pin.write(True)
-        sleep(self.TIME_DELAY)
         self.spi.transfer([self.framebuffer[i]])
-        sleep(self.TIME_DELAY)
         self.a0_pin.write(False)
 
     def clear_pixel(self, x: int, y: int) -> None:
@@ -220,9 +209,7 @@ class NHDC12864A1ZFSWFBWHTT:
 
         self.spi.transfer([page, 0x10, 0x00])
         self.a0_pin.write(True)
-        sleep(self.TIME_DELAY)
         self.spi.transfer([self.framebuffer[i]])
-        sleep(self.TIME_DELAY)
         self.a0_pin.write(False)
 
     def draw_fill_rect(self, x: int, y: int, width: int, height: int) -> None:
