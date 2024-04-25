@@ -29,10 +29,11 @@ When making changes, please follow these guidelines:
   if necessary.
 - After making changes, please validate your changes.
 
-1. Run static type checking with ``--strict`` flag: ``mypy --strict iclib``
-2. Run style checking: ``flake8 iclib``
-3. Run unit tests: ``python -m unittest``
-4. Run doctests: ``python -m doctest iclib/*.py``
+1. Run style checking: ``flake8 iclib``
+2. Run static type checking with ``--strict`` flag: ``mypy --strict iclib``
+3. Run checks for missing docstrings: ``interrogate -f 100 -i -m -n -p -s -r '^\w+TestCase' iclib``
+4. Run unit tests: ``python -m unittest``
+5. Run doctests: ``python -m doctest iclib/*.py``
 
 Submitting a Pull Request
 -------------------------
