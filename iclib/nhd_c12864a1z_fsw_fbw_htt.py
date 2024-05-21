@@ -92,9 +92,9 @@ class NHDC12864A1ZFSWFBWHTT:
                 0x26,              # Resistor Ratio Set.
                 0x81,              # Electronic Volume Command (set contrast).
                 0x11,              # Electronic Volume value (contrast value).
+                self.DISPLAY_ON,   # Display ON
             ]
         )
-        self.spi.transfer([self.DISPLAY_ON])  # Display ON.
 
     def clear_screen(self) -> None:
         """Clears the framebuffer and the display.
