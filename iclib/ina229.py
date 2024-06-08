@@ -250,7 +250,7 @@ class INA229:
         return (
             195.3125
             * twos_complement(self.read(Register.VBUS) >> 4, 20)
-            / 1e9
+            / 1e6
         )
 
     @property
