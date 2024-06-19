@@ -6,15 +6,9 @@ from iclib.mcp23s17 import MCP23S17, Mode, Port, Register
 
 class MCP23S17TestCase(TestCase):
     def test_read_register(self) -> None:
-        mock_hardware_address_pin_0_gpio = MagicMock()
-        mock_hardware_address_pin_1_gpio = MagicMock()
-        mock_hardware_address_pin_2_gpio = MagicMock()
         mock_hardware_reset_gpio = MagicMock()
         mock_interrupt_output_a_gpio = MagicMock()
         mock_interrupt_output_b_gpio = MagicMock()
-        mock_hardware_address_pin_0_gpio.read.return_value = False
-        mock_hardware_address_pin_1_gpio.read.return_value = False
-        mock_hardware_address_pin_2_gpio.read.return_value = False
         mock_hardware_reset_gpio.read.return_value = False
         mock_interrupt_output_a_gpio.read.return_value = False
         mock_interrupt_output_b_gpio.read.return_value = False
@@ -27,9 +21,6 @@ class MCP23S17TestCase(TestCase):
         )
         mock_spi.transfer.return_value = [0b11111111, 0b11111111, 0b00000000]
         mcp23s17 = MCP23S17(
-            mock_hardware_address_pin_0_gpio,
-            mock_hardware_address_pin_1_gpio,
-            mock_hardware_address_pin_2_gpio,
             mock_hardware_reset_gpio,
             mock_interrupt_output_a_gpio,
             mock_interrupt_output_b_gpio,

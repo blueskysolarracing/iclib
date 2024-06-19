@@ -364,12 +364,11 @@ class Operation(ABC):
 
     @property
     def control_byte(self) -> int:
-        if self.hardware_address is None:
-            hardware_address = 0
-        else:
-            hardware_address = self.hardware_address
-
-        return (0b0100 << 4) | (hardware_address << 1) | self.READ_OR_WRITE_BIT
+        return (
+            (0b0100 << 4)
+            | (self.hardware_address << 1)
+            | self.READ_OR_WRITE_BIT
+        )
 
     @property
     @abstractmethod
@@ -438,12 +437,6 @@ class MCP23S17:
     """The supported spi bit order."""
     SPI_WORD_BIT_COUNT: ClassVar[int] = 8
     """The supported spi number of bits per word."""
-    hardware_address_pin_0_gpio: GPIO
-    """The hardware address pin 0 GPIO."""
-    hardware_address_pin_1_gpio: GPIO
-    """The hardware address pin 1 GPIO."""
-    hardware_address_pin_2_gpio: GPIO
-    """The hardware address pin 2 GPIO."""
     hardware_reset_gpio: GPIO
     """The hardware reset GPIO."""
     interrupt_output_a_gpio: GPIO
@@ -452,7 +445,8 @@ class MCP23S17:
     """The interrupt output for PORTB GPIO."""
     spi: SPI
     """The SPI."""
-    _hardware_address: int = field(init=False)
+    hardware_address: int = 0
+    """The hardware address."""
     _mode: Mode = field(default=Mode.SIXTEEN_BIT_MODE, init=False)
 
     def __post_init__(self) -> None:
@@ -467,33 +461,6 @@ class MCP23S17:
 
         if self.spi.extra_flags:
             warn(f'unknown spi extra flags {self.spi.extra_flags}')
-
-        self._hardware_address = (
-            self.hardware_address_pin_0_gpio.read()
-            | (self.hardware_address_pin_1_gpio.read() << 1)
-            | (self.hardware_address_pin_2_gpio.read() << 2)
-        )
-
-    @property
-    def hardware_address(self) -> int:
-        assert (
-            self._hardware_address
-            == (
-                self.hardware_address_pin_0_gpio.read()
-                | (self.hardware_address_pin_1_gpio.read() << 1)
-                | (self.hardware_address_pin_2_gpio.read() << 2)
-            )
-        )
-
-        return self._hardware_address
-
-    @hardware_address.setter
-    def hardware_address(self, value: int) -> None:
-        self.hardware_address_pin_0_gpio.write(bool(value & 0b001))
-        self.hardware_address_pin_1_gpio.write(bool(value & 0b010))
-        self.hardware_address_pin_2_gpio.write(bool(value & 0b100))
-
-        self._hardware_address = value
 
     @property
     def mode(self) -> Mode:
@@ -540,11 +507,7 @@ class MCP23S17:
             data_byte_count: int,
     ) -> list[int]:
         return self.operate(
-            Read(
-                0 if self.hardware_address is None else self.hardware_address,
-                register_address,
-                data_byte_count,
-            ),
+            Read(self.hardware_address, register_address, data_byte_count),
         )
 
     def write(
@@ -553,11 +516,7 @@ class MCP23S17:
             data_bytes: list[int],
     ) -> list[int]:
         return self.operate(
-            Write(
-                0 if self.hardware_address is None else self.hardware_address,
-                register_address,
-                data_bytes,
-            ),
+            Write(self.hardware_address, register_address, data_bytes),
         )
 
     def get_register_address(self, port: Port, register: Register) -> int:
