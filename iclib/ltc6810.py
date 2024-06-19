@@ -264,12 +264,14 @@ class LTC6810:
     def start_cell_voltage_adc_conversion_and_poll_status(
             self,
             adc_mode: ADCMode,
+            discharge_permitted_status: bool,
             channel: int,
             address: int | None = None,
             sleep: bool = True,
     ) -> None:
         command = 0b01001100000
         command |= adc_mode.mode << 7
+        command |= discharge_permitted_status << 4
         command |= channel
 
         if address is None:
