@@ -3,13 +3,43 @@ from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
 from time import sleep as _sleep
+from typing import ClassVar
+from warnings import warn
 
 from periphery import SPI
 
 
 @dataclass
 class LTC6810:
+    SPI_MODE: ClassVar[int] = 0b11
+    """The supported spi mode."""
+    MIN_SPI_MAX_SPEED: ClassVar[float] = 3e6
+    """The supported minimum spi maximum speed."""
+    MAX_SPI_MAX_SPEED: ClassVar[float] = 3.5e6
+    """The supported maximum spi maximum speed."""
+    SPI_BIT_ORDER: ClassVar[str] = 'msb'
+    """The supported spi bit order."""
+    SPI_WORD_BIT_COUNT: ClassVar[int] = 8
+    """The supported spi number of bits per word."""
     spi: SPI
+    """The SPI for the ADC device."""
+
+    def __post_init__(self) -> None:
+        if self.spi.mode != self.SPI_MODE:
+            raise ValueError('unsupported spi mode')
+        elif not (
+                self.MIN_SPI_MAX_SPEED
+                <= self.spi.max_speed
+                <= self.MAX_SPI_MAX_SPEED
+        ):
+            raise ValueError('unsupported spi maximum speed')
+        elif self.spi.bit_order != self.SPI_BIT_ORDER:
+            raise ValueError('unsupported spi bit order')
+        elif self.spi.bits_per_word != self.SPI_WORD_BIT_COUNT:
+            raise ValueError('unsupported spi number of bits per word')
+
+        if self.spi.extra_flags:
+            warn(f'unknown spi extra flags {self.spi.extra_flags}')
 
     @classmethod
     def get_voltage(cls, data_bytes: list[int]) -> float:
@@ -72,18 +102,16 @@ class LTC6810:
                 PEC[1] = PEC[0]
                 PEC[0] = IN0
 
-        PEC.insert(0, False)
-
         PEC0 = 0
         PEC1 = 0
 
         for i, PEC_bit in enumerate(PEC):
-            bit = PEC_bit << (1 << (i % 8))
+            bit = PEC_bit << i
 
-            if i < 8:
-                PEC0 |= bit
+            if i < 7:
+                PEC1 |= bit << 1
             else:
-                PEC1 |= bit
+                PEC0 |= bit >> 7
 
         return PEC0, PEC1
 
@@ -175,8 +203,8 @@ class LTC6810:
         :param command: The command.
         :return: The broadcast command bytes.
         """
-        CMD1 = command >> 8
-        CMD0 = command & ((1 << 8) - 1)
+        CMD0 = command >> 8
+        CMD1 = command & ((1 << 8) - 1)
 
         return CMD0, CMD1
 
@@ -195,7 +223,7 @@ class LTC6810:
         :return: The address command bytes.
         """
         CMD0, CMD1 = cls.get_broadcast_command_bytes(command)
-        CMD1 |= (1 << 7) | (address << 3)
+        CMD0 |= (1 << 7) | (address << 3)
 
         return CMD0, CMD1
 
@@ -247,10 +275,10 @@ class LTC6810:
         if address is None:
             raise NotImplementedError
         else:
-            transmitted_bytes = self.get_address_read_command_bytes(
+            transmitted_bytes = self.get_address_poll_command_bytes(
                 address,
                 command,
-                6,
+                0,
             )
 
         self.spi.transfer(transmitted_bytes)
