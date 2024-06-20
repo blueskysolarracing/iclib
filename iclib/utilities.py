@@ -12,3 +12,22 @@ def twos_complement(value: int, bit_count: int) -> int:
         value -= (1 << bit_count)
 
     return value
+
+
+def lsb_bits_to_byte(*bits: bool) -> int:
+    byte = 0
+
+    for i, bit in enumerate(bits):
+        byte |= bit << i
+
+    return byte
+
+
+def msb_bits_to_byte(*bits: bool) -> int:
+    byte = 0
+
+    for bit in bits:
+        byte <<= 1
+        byte |= bit
+
+    return byte

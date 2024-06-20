@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
@@ -7,6 +7,8 @@ from typing import ClassVar
 from warnings import warn
 
 from periphery import SPI
+
+from iclib.utilities import lsb_bits_to_byte, msb_bits_to_byte
 
 
 @dataclass
@@ -102,16 +104,8 @@ class LTC6810:
                 PEC[1] = PEC[0]
                 PEC[0] = IN0
 
-        PEC0 = 0
-        PEC1 = 0
-
-        for i, PEC_bit in enumerate(PEC):
-            bit = PEC_bit << i
-
-            if i < 7:
-                PEC1 |= bit << 1
-            else:
-                PEC0 |= bit >> 7
+        PEC0 = lsb_bits_to_byte(*PEC[7:])
+        PEC1 = lsb_bits_to_byte(*PEC[:7]) << 1
 
         return PEC0, PEC1
 
@@ -128,7 +122,8 @@ class LTC6810:
 
         :param address: The device address.
         :param command: The command.
-        :param poll_data_byte_count: The number of data bytes to be polled.
+        :param poll_data_byte_count: The number of data bytes to be
+                                     polled.
         :return: The address poll command bytes.
         """
         command_bytes = cls.get_address_command_bytes(address, command)
@@ -227,8 +222,8 @@ class LTC6810:
 
         return CMD0, CMD1
 
-    class ADCMode(Enum):
-        """The ADC Modes, as defined in Page 63 of datasheet."""
+    class CHMode(Enum):
+        """The CH ADC Modes, as defined in Page 63 of datasheet."""
 
         M27000 = 0b01, 524e-6, 200e-6
         """27 kHz Mode (Fast)."""
@@ -261,18 +256,42 @@ class LTC6810:
                 cell_total_conversion_time
             )
 
-    def start_cell_voltage_adc_conversion_and_poll_status(
+    def ADCV(
             self,
-            adc_mode: ADCMode,
-            discharge_permitted_status: bool,
-            channel: int,
+            ch_mode: CHMode,
+            DCP: bool,
+            CH: int,
             address: int | None = None,
             sleep: bool = True,
     ) -> None:
+        """Start cell voltage ADC conversion and poll status.
+
+        DCP values:
+
+        - ``False``: discharge not permitted.
+        - ``True``: discharge permitted.
+
+        CH values:
+
+        - ``0b000``: all cells.
+        - ``0b001``: Cell 1.
+        - ``0b010``: Cell 2.
+        - ``0b011``: Cell 3.
+        - ``0b100``: Cell 4.
+        - ``0b101``: Cell 5.
+        - ``0b110``: Cell 6.
+
+        :param ch_mode: The ADC mode.
+        :param DCP: Dischrage permitted.
+        :param CH: GPIO selection for ADC conversion.
+        :param address: The optional address.
+        :param sleep: Sleep for required period of time.
+        :return: ``None``.
+        """
         command = 0b01001100000
-        command |= adc_mode.mode << 7
-        command |= discharge_permitted_status << 4
-        command |= channel
+        command |= ch_mode.mode << 7
+        command |= DCP << 4
+        command |= CH
 
         if address is None:
             raise NotImplementedError
@@ -286,23 +305,27 @@ class LTC6810:
         self.spi.transfer(transmitted_bytes)
 
         if sleep:
-            if channel:
-                timeout = adc_mode.cell_total_conversion_time
+            if CH:
+                timeout = ch_mode.cell_total_conversion_time
             else:
-                timeout = adc_mode.all_cells_total_conversion_time
+                timeout = ch_mode.all_cells_total_conversion_time
 
             _sleep(timeout)
 
     @dataclass
-    class CellVoltageRegisterGroupA:
+    class CVAR:
+        """Cell voltage register group A."""
+
         C1V: float
         C2V: float
         C3V: float
 
-    def read_cell_voltage_register_group_a(
-            self,
-            address: int | None = None,
-    ) -> CellVoltageRegisterGroupA:
+    def RDCVA(self, address: int | None = None) -> CVAR:
+        """Read cell voltage register group A.
+
+        :param address: The optional address.
+        :return: ``None``.
+        """
         if address is None:
             raise NotImplementedError
         else:
@@ -316,22 +339,26 @@ class LTC6810:
 
         assert isinstance(received_bytes, list)
 
-        return self.CellVoltageRegisterGroupA(
+        return self.CVAR(
             self.get_voltage(received_bytes[0:2]),
             self.get_voltage(received_bytes[2:4]),
             self.get_voltage(received_bytes[4:6]),
         )
 
     @dataclass
-    class CellVoltageRegisterGroupB:
+    class CVBR:
+        """Cell voltage register group B."""
+
         C4V: float
         C5V: float
         C6V: float
 
-    def read_cell_voltage_register_group_b(
-            self,
-            address: int | None = None,
-    ) -> CellVoltageRegisterGroupB:
+    def RDCVB(self, address: int | None = None) -> CVBR:
+        """Read cell voltage register group B.
+
+        :param address: The optional address.
+        :return: ``None``.
+        """
         if address is None:
             raise NotImplementedError
         else:
@@ -345,8 +372,251 @@ class LTC6810:
 
         assert isinstance(received_bytes, list)
 
-        return self.CellVoltageRegisterGroupB(
+        return self.CVBR(
             self.get_voltage(received_bytes[0:2]),
             self.get_voltage(received_bytes[2:4]),
             self.get_voltage(received_bytes[4:6]),
         )
+
+    class CHGMode(Enum):
+        """The CHG ADC Modes, as defined in Page 63 of datasheet."""
+
+        M27000 = 0b01, 521e-6, 200e-6
+        """27 kHz Mode (Fast)."""
+        M14000 = 0b01, 695e-6, 229e-6
+        """14 kHz Mode."""
+        M7000 = 0b10, 1.2e-3, 403e-6
+        """7 kHz Mode (Normal)."""
+        M3000 = 0b10, 1.9e-3, 520e-6
+        """3 kHz Mode."""
+        M2000 = 0b11, 3.3e-3, 752e-6
+        """2 kHz Mode."""
+        M1000 = 0b00, 6.1e-3, 1.2e-3
+        """1 kHz Mode."""
+        M422 = 0b00, 12e-3, 2.1e-3
+        """422Hz Mode."""
+        M26 = 0b11, 183e-3, 34e-3
+        """26 Hz Mode (Filtered)."""
+
+        def __init__(
+                self,
+                mode: int,
+                all_cells_total_conversion_time: float,
+                cell_total_conversion_time: float,
+        ):
+            self.mode: int = mode
+            self.all_cells_total_conversion_time: float = (
+                all_cells_total_conversion_time
+            )
+            self.cell_total_conversion_time: float = (
+                cell_total_conversion_time
+            )
+
+    def AXOW(
+            self,
+            chg_mode: CHGMode,
+            PUP: bool,
+            CHG: int,
+            address: int | None = None,
+            sleep: bool = True,
+    ) -> None:
+        """Start GPIOS/Cell 0/REF2 ADC open wire conversion.
+
+        PUP values:
+
+        - ``False``: Pull-down current.
+        - ``True``: Pull-up current.
+
+        CHG values:
+
+        - ``0b000``: S0, GPIO 1-4, 2nd reference.
+        - ``0b001``: S0.
+        - ``0b010``: GPIO 1.
+        - ``0b011``: GPIO 2.
+        - ``0b100``: GPIO 3.
+        - ``0b101``: GPIO 4.
+        - ``0b110``: 2nd reference.
+
+        :param chg_mode: The ADC mode.
+        :param PUP: Pull-up/pull-down current for open wire conversions.
+        :param CHG: GPIO selection for ADC conversion.
+        :param address: The optional address.
+        :param sleep: Sleep for required period of time.
+        :return: ``None``.
+        """
+        command = 0b10000010000
+        command |= chg_mode.mode << 7
+        command |= PUP << 6
+        command |= CHG
+
+        if address is None:
+            raise NotImplementedError
+        else:
+            transmitted_bytes = self.get_address_poll_command_bytes(
+                address,
+                command,
+                0,
+            )
+
+        self.spi.transfer(transmitted_bytes)
+
+        if sleep:
+            if CHG:
+                timeout = chg_mode.cell_total_conversion_time
+            else:
+                timeout = chg_mode.all_cells_total_conversion_time
+
+            _sleep(timeout)
+
+    @dataclass
+    class AVAR:
+        S0V: float
+        G1V: float
+        G2V: float
+
+    def RDAUXA(self, address: int | None = None) -> AVAR:
+        """Read auxiliary register group A.
+
+        :param address: The optional address.
+        :return: ``None``.
+        """
+        if address is None:
+            raise NotImplementedError
+        else:
+            transmitted_bytes = self.get_address_read_command_bytes(
+                address,
+                0b00000001100,
+                6,
+            )
+
+        received_bytes = self.spi.transfer(transmitted_bytes)[-6:]
+
+        assert isinstance(received_bytes, list)
+
+        return self.AVAR(
+            self.get_voltage(received_bytes[0:2]),
+            self.get_voltage(received_bytes[2:4]),
+            self.get_voltage(received_bytes[4:6]),
+        )
+
+    @dataclass
+    class AVBR:
+        """Auxiliary register group B."""
+
+        G3V: float
+        G4V: float
+        REF: float
+
+    def RDAUXB(self, address: int | None = None) -> AVBR:
+        """Read auxiliary register group B.
+
+        :param address: The optional address.
+        :return: ``None``.
+        """
+        if address is None:
+            raise NotImplementedError
+        else:
+            transmitted_bytes = self.get_address_read_command_bytes(
+                address,
+                0b00000001110,
+                6,
+            )
+
+        received_bytes = self.spi.transfer(transmitted_bytes)[-6:]
+
+        assert isinstance(received_bytes, list)
+
+        return self.AVBR(
+            self.get_voltage(received_bytes[0:2]),
+            self.get_voltage(received_bytes[2:4]),
+            self.get_voltage(received_bytes[4:6]),
+        )
+
+    @dataclass
+    class CFGR(Iterable[int]):
+        """The configuration register group (Table 42)."""
+
+        GPIO4: bool = False
+        GPIO3: bool = False
+        GPIO2: bool = False
+        GPIO1: bool = False
+        REFON: bool = False
+        DTEN: bool = False
+        ADCOPT: bool = False
+        VUV: int = 0
+        VOV: int = 0
+        DCC0: bool = False
+        MCAL: bool = False
+        DCC6: bool = False
+        DCC5: bool = False
+        DCC4: bool = False
+        DCC3: bool = False
+        DCC2: bool = False
+        DCC1: bool = False
+        DCTO: int = 0
+        SCONV: bool = False
+        FDRF: bool = False
+        DIS_RED: bool = False
+        DTMEN: bool = False
+
+        def __iter__(self) -> Iterator[int]:
+            return iter(self.bytes)
+
+        @property
+        def bytes(self) -> tuple[int, ...]:
+            CFGR0 = msb_bits_to_byte(
+                False,
+                self.GPIO4,
+                self.GPIO3,
+                self.GPIO2,
+                self.GPIO1,
+                self.REFON,
+                self.DTEN,
+                self.ADCOPT,
+            )
+            CFGR1 = self.VUV & ((1 << 8) - 1)
+            CFGR2 = ((self.VOV & ((1 << 4) - 1)) << 4) | (self.VUV >> 8)
+            CFGR3 = self.VOV >> 4
+            CFGR4 = msb_bits_to_byte(
+                self.DCC0,
+                self.MCAL,
+                self.DCC6,
+                self.DCC5,
+                self.DCC4,
+                self.DCC3,
+                self.DCC2,
+                self.DCC1,
+            )
+            CFGR5 = (
+                (self.DCTO << 4)
+                | msb_bits_to_byte(
+                    False,
+                    False,
+                    False,
+                    False,
+                    self.SCONV,
+                    self.FDRF,
+                    self.DIS_RED,
+                    self.DTMEN,
+                )
+            )
+
+            return CFGR0, CFGR1, CFGR2, CFGR3, CFGR4, CFGR5
+
+    def WRCFG(self, CFGR: CFGR, address: int | None = None) -> None:
+        """Write configuration register group.
+
+        :param CFGR: The configuration register group.
+        :param address: The optional address.
+        :return: ``None``.
+        """
+        if address is None:
+            raise NotImplementedError
+        else:
+            transmitted_bytes = self.get_address_write_command_bytes(
+                address,
+                0b00000000001,
+                CFGR,
+            )
+
+        self.spi.transfer(transmitted_bytes)

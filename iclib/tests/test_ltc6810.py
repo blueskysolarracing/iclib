@@ -25,12 +25,7 @@ class LTC6810TestCase(TestCase):
         )
         ltc6810 = LTC6810(mock_spi)
 
-        ltc6810.start_cell_voltage_adc_conversion_and_poll_status(
-            LTC6810.ADCMode.M7000,
-            0,
-            0,
-            sleep=False,
-        )
+        ltc6810.ADCV(LTC6810.CHMode.M7000, False, 0, 0, sleep=False)
 
         command_bytes = 0b10000011, 0b01100000
         packet_error_code_bytes = LTC6810.get_packet_error_code_bytes(
@@ -51,7 +46,7 @@ class LTC6810TestCase(TestCase):
         mock_spi.transfer.return_value = [0] * 6
         ltc6810 = LTC6810(mock_spi)
 
-        group = ltc6810.read_cell_voltage_register_group_a(0)
+        group = ltc6810.RDCVA(0)
 
         self.assertAlmostEqual(group.C1V, 0)
         self.assertAlmostEqual(group.C2V, 0)
@@ -81,7 +76,7 @@ class LTC6810TestCase(TestCase):
         mock_spi.transfer.return_value = [0] * 6
         ltc6810 = LTC6810(mock_spi)
 
-        group = ltc6810.read_cell_voltage_register_group_b(0)
+        group = ltc6810.RDCVB(0)
 
         self.assertAlmostEqual(group.C4V, 0)
         self.assertAlmostEqual(group.C5V, 0)
