@@ -153,7 +153,7 @@ class LTC6810:
         :param data_bytes: The data bytes to be written.
         :return: The address read command bytes.
         """
-        command_bytes = cls.get_broadcast_command_bytes(command)
+        command_bytes = cls.get_address_command_bytes(address, command)
         data_bytes = tuple(data_bytes)
 
         return list(
@@ -264,7 +264,8 @@ class LTC6810:
             address: int | None = None,
             sleep: bool = True,
     ) -> None:
-        """Start cell voltage ADC conversion and poll status. Refer to Table 40 (Page 61) of datasheet.
+        """Start cell voltage ADC conversion and poll status. Refer to
+        Table 40 (Page 61) of datasheet.
 
         DCP values:
 
@@ -321,7 +322,8 @@ class LTC6810:
         C3V: float
 
     def RDCVA(self, address: int | None = None) -> CVAR:
-        """Read cell voltage register group A. Refer to Table 40 (Page 61) on datasheet.
+        """Read cell voltage register group A. Refer to Table 40 (Page
+        61) on datasheet.
 
         :param address: The optional address.
         :return: ``None``.
@@ -354,7 +356,8 @@ class LTC6810:
         C6V: float
 
     def RDCVB(self, address: int | None = None) -> CVBR:
-        """Read cell voltage register group B. Refer to Table 40 (Page 61) on datasheet.
+        """Read cell voltage register group B. Refer to Table 40 (Page
+        61) on datasheet.
 
         :param address: The optional address.
         :return: ``None``.
@@ -391,7 +394,7 @@ class LTC6810:
         """3 kHz Mode."""
         M2000 = 0b11, 3.3e-3, 752e-6
         """2 kHz Mode."""
-        M1000 = 0b00, 6.1e-3, 1.2e-3
+        M1000 = 0b00, 6e-3, 1.2e-3
         """1 kHz Mode."""
         M422 = 0b00, 12e-3, 2.1e-3
         """422Hz Mode."""
@@ -420,7 +423,8 @@ class LTC6810:
             address: int | None = None,
             sleep: bool = True,
     ) -> None:
-        """Start GPIOS/Cell 0/REF2 ADC open wire conversion. Refer to Table 40 (Page 62) on datasheet.
+        """Start GPIOS/Cell 0/REF2 ADC open wire conversion. Refer to
+        Table 40 (Page 62) on datasheet.
 
         PUP values:
 
@@ -475,7 +479,8 @@ class LTC6810:
         G2V: float
 
     def RDAUXA(self, address: int | None = None) -> AVAR:
-        """Read auxiliary register group A. Refer to Table 40 (Page 61) on datasheet.
+        """Read auxiliary register group A. Refer to Table 40 (Page 61)
+        on datasheet.
 
         :param address: The optional address.
         :return: ``None``.
@@ -508,7 +513,8 @@ class LTC6810:
         REF: float
 
     def RDAUXB(self, address: int | None = None) -> AVBR:
-        """Read auxiliary register group B. Refer to Table 40 (Page 61) on datasheet.
+        """Read auxiliary register group B. Refer to Table 40 (Page 61)
+        on datasheet.
 
         :param address: The optional address.
         :return: ``None``.
@@ -604,7 +610,8 @@ class LTC6810:
             return CFGR0, CFGR1, CFGR2, CFGR3, CFGR4, CFGR5
 
     def WRCFG(self, CFGR: CFGR, address: int | None = None) -> None:
-        """Write configuration register group. Refer to Table 40 (Page 61) on datasheet.
+        """Write configuration register group. Refer to Table 40 (Page
+        61) on datasheet.
 
         :param CFGR: The configuration register group.
         :param address: The optional address.

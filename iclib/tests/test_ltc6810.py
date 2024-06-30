@@ -52,7 +52,7 @@ class LTC6810TestCase(TestCase):
         self.assertAlmostEqual(group.C2V, 0)
         self.assertAlmostEqual(group.C3V, 0)
 
-        command_bytes = 0b00000000, 0b00000100
+        command_bytes = 0b10000000, 0b00000100
         data_bytes = [0xFF] * 6
         transmitted_bytes = list(
             chain(
@@ -82,7 +82,7 @@ class LTC6810TestCase(TestCase):
         self.assertAlmostEqual(group.C5V, 0)
         self.assertAlmostEqual(group.C6V, 0)
 
-        command_bytes = 0b00000000, 0b00000110
+        command_bytes = 0b10000000, 0b00000110
         data_bytes = [0xFF] * 6
         transmitted_bytes = list(
             chain(
