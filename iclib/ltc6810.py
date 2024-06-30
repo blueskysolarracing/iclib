@@ -264,7 +264,7 @@ class LTC6810:
             address: int | None = None,
             sleep: bool = True,
     ) -> None:
-        """Start cell voltage ADC conversion and poll status.
+        """Start cell voltage ADC conversion and poll status. Refer to Table 40 (Page 61) of datasheet.
 
         DCP values:
 
@@ -282,7 +282,7 @@ class LTC6810:
         - ``0b110``: Cell 6.
 
         :param ch_mode: The ADC mode.
-        :param DCP: Dischrage permitted.
+        :param DCP: Discharge permitted.
         :param CH: GPIO selection for ADC conversion.
         :param address: The optional address.
         :param sleep: Sleep for required period of time.
@@ -321,7 +321,7 @@ class LTC6810:
         C3V: float
 
     def RDCVA(self, address: int | None = None) -> CVAR:
-        """Read cell voltage register group A.
+        """Read cell voltage register group A. Refer to Table 40 (Page 61) on datasheet.
 
         :param address: The optional address.
         :return: ``None``.
@@ -354,7 +354,7 @@ class LTC6810:
         C6V: float
 
     def RDCVB(self, address: int | None = None) -> CVBR:
-        """Read cell voltage register group B.
+        """Read cell voltage register group B. Refer to Table 40 (Page 61) on datasheet.
 
         :param address: The optional address.
         :return: ``None``.
@@ -420,7 +420,7 @@ class LTC6810:
             address: int | None = None,
             sleep: bool = True,
     ) -> None:
-        """Start GPIOS/Cell 0/REF2 ADC open wire conversion.
+        """Start GPIOS/Cell 0/REF2 ADC open wire conversion. Refer to Table 40 (Page 62) on datasheet.
 
         PUP values:
 
@@ -475,7 +475,7 @@ class LTC6810:
         G2V: float
 
     def RDAUXA(self, address: int | None = None) -> AVAR:
-        """Read auxiliary register group A.
+        """Read auxiliary register group A. Refer to Table 40 (Page 61) on datasheet.
 
         :param address: The optional address.
         :return: ``None``.
@@ -508,7 +508,7 @@ class LTC6810:
         REF: float
 
     def RDAUXB(self, address: int | None = None) -> AVBR:
-        """Read auxiliary register group B.
+        """Read auxiliary register group B. Refer to Table 40 (Page 61) on datasheet.
 
         :param address: The optional address.
         :return: ``None``.
@@ -604,7 +604,7 @@ class LTC6810:
             return CFGR0, CFGR1, CFGR2, CFGR3, CFGR4, CFGR5
 
     def WRCFG(self, CFGR: CFGR, address: int | None = None) -> None:
-        """Write configuration register group.
+        """Write configuration register group. Refer to Table 40 (Page 61) on datasheet.
 
         :param CFGR: The configuration register group.
         :param address: The optional address.
