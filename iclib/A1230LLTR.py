@@ -63,4 +63,62 @@ class A1230LLTR:
         """
         return self.output_B_gpio.read()
         
+    def get_frequency_a(self) -> float:
+        """Get frequency from OUTPUTA pin.
+
+        :return: Frequency in Hz for output A (E1).
+        """
+        
+        beginning_event = self.output_A_gpio.read_event()
+        ending_event = None
+
+        while (
+            (
+                ending_event == None
+            ) 
+            or (
+                (
+                    ending_event.edge == beginning_event.edge
+                ) 
+                and (
+                    ending_event.timestamp == beginning_event.timestamp
+                )
+            )
+            or (
+                ending_event.edge != beginning_event.edge
+            )
+        ):
+            ending_event = self.output_A_gpio.read_event()
+
+        period = ending_event.timestamp - beginning_event.timestamp
+        return 1 / (period/1e9)
     
+    def get_frequency_b(self) -> float:
+        """Get frequency from OUTPUTB pin.
+
+        :return: Frequency in Hz for output B (E2).
+        """
+        
+        beginning_event = self.output_B_gpio.read_event()
+        ending_event = None
+
+        while (
+            (
+                ending_event == None
+            ) 
+            or (
+                (
+                    ending_event.edge == beginning_event.edge
+                ) 
+                and (
+                    ending_event.timestamp == beginning_event.timestamp
+                )
+            )
+            or (
+                ending_event.edge != beginning_event.edge
+            )
+        ):
+            ending_event = self.output_B_gpio.read_event()
+
+        period = ending_event.timestamp - beginning_event.timestamp
+        return 1 / (period/1e9)
