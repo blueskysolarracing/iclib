@@ -63,7 +63,7 @@ class FrequencyMonitor:
 
                 if len(timestamps) > 1:
                     self.frequency = (
-                        len(timestamps)
+                        (len(timestamps) - 1)
                         / (timestamps[-1] - timestamps[0])
                     )
 
