@@ -5,7 +5,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from threading import Event, Lock, Thread
 from time import time
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from periphery import GPIO, SPI
 
@@ -83,23 +83,17 @@ class FrequencyMonitor:
         self._thread.join()
 
 
-class ManualCSSPI(SPI):
+@dataclass
+class ManualCSSPI:
     CHIP_SELECT_GPIO_INVERTED: ClassVar[bool] = False
+    chip_select_gpio: GPIO
+    spi: SPI
 
-    def __init__(
-            self,
-            chip_select_gpio: GPIO,
-            *args: Any,
-            **kwargs: Any,
-    ) -> None:
-        super().__init__(*args, **kwargs)
-
-        if chip_select_gpio.inverted != self.CHIP_SELECT_GPIO_INVERTED:
+    def __post_init__(self) -> None:
+        if self.chip_select_gpio.inverted != self.CHIP_SELECT_GPIO_INVERTED:
             raise ValueError('chip select gpio should be inverted')
 
-        chip_select_gpio.write(False)
-
-        self.chip_select_gpio = chip_select_gpio
+        self.chip_select_gpio.write(False)
 
     def transfer(
             self,
@@ -107,7 +101,7 @@ class ManualCSSPI(SPI):
     ) -> bytes | bytearray | list[int]:
         self.chip_select_gpio.write(True)
 
-        received_data = super().transfer(data)
+        received_data = self.spi.transfer(data)
 
         self.chip_select_gpio.write(False)
 
