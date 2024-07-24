@@ -5,8 +5,9 @@ from collections import deque
 from dataclasses import dataclass, field
 from threading import Event, Lock, Thread
 from time import time
+from typing import Any, ClassVar
 
-from periphery import GPIO
+from periphery import GPIO, SPI
 
 
 def bit_getter(index: int) -> Callable[[int], bool]:
@@ -80,3 +81,34 @@ class FrequencyMonitor:
     def stop(self) -> None:
         self._stoppage.set()
         self._thread.join()
+
+
+class ManualCSSPI(SPI):
+    CHIP_SELECT_GPIO_INVERTED: ClassVar[bool] = False
+
+    def __init__(
+            self,
+            chip_select_gpio: GPIO,
+            *args: Any,
+            **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+
+        if chip_select_gpio.inverted != self.CHIP_SELECT_GPIO_INVERTED:
+            raise ValueError('chip select gpio should be inverted')
+
+        chip_select_gpio.write(False)
+
+        self.chip_select_gpio = chip_select_gpio
+
+    def transfer(
+            self,
+            data: bytes | bytearray | list[int],
+    ) -> bytes | bytearray | list[int]:
+        self.chip_select_gpio.write(True)
+
+        received_data = super().transfer(data)
+
+        self.chip_select_gpio.write(False)
+
+        return received_data

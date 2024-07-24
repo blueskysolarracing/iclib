@@ -158,7 +158,7 @@ class INA229:
     Expander with Serial Interface.
     """
 
-    SPI_MODE: ClassVar[int] = 0b00
+    SPI_MODE: ClassVar[int] = 0b01
     """The supported spi modes."""
     MAX_SPI_MAX_SPEED: ClassVar[float] = 10e6
     """The supported maximum spi maximum speed."""
