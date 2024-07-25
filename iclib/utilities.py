@@ -42,6 +42,11 @@ def msb_bits_to_byte(*bits: bool) -> int:
 
 @dataclass
 class FrequencyMonitor:
+    """Calculate the frequency of how frequently a GPIO is triggered.
+
+    The GPIO can be configured to be triggered on any or both edges.
+    """
+
     gpio: GPIO
     sample_count: int = field(default=5)
     poll_timeout: float = field(default=1)

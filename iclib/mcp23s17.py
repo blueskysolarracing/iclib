@@ -1,5 +1,7 @@
 """This module implements the MCP23S17 driver."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import auto, Enum, IntEnum
@@ -572,3 +574,55 @@ class MCP23S17:
             data_byte ^= 1 << bit
 
             self.write_register(port, register, [data_byte])
+
+    @dataclass
+    class Line:
+        mcp23s17: MCP23S17
+        port: Port
+        register: Register
+        bit: int
+        direction: str
+        inverted: bool = False
+
+        def __post_init__(self) -> None:
+            if self.register != Register.GPIO:
+                raise ValueError('needs to be GPIO register')
+
+            match self.direction:
+                case 'in':
+                    value = True
+                case 'out':
+                    value = False
+                case _:
+                    raise ValueError(f'unknown direction {self.direction}')
+
+            self.mcp23s17.write_bit(
+                self.port,
+                self.register,
+                self.bit,
+                value,
+            )
+
+        def read(self) -> bool:
+            value = self.mcp23s17.read_bit(self.port, self.register, self.bit)
+
+            if self.inverted:
+                value = not value
+
+            return value
+
+        def write(self, value: bool) -> None:
+            if self.inverted:
+                value = not value
+
+            self.mcp23s17.write_bit(self.port, self.register, self.bit, value)
+
+    def get_line(
+            self,
+            port: Port,
+            register: Register,
+            bit: int,
+            direction: str,
+            inverted: bool = False,
+    ) -> Line:
+        return self.Line(self, port, register, bit, direction, inverted)

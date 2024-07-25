@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import floor
 from typing import ClassVar
 from warnings import warn
@@ -13,15 +13,6 @@ class NHDC12864A1ZFSWFBWHTT:
     NHD-C12864A1Z-FSW-FBW-HTT COG (Chip-On-Glass) Liquid Crystal Display
     Module
     """
-
-    SPI_MODE: ClassVar[int] = 0b11
-    """The supported spi modes."""
-    MIN_SPI_MAX_SPEED: ClassVar[float] = 5e4
-    """The supported minimum spi maximum speed."""
-    MAX_SPI_MAX_SPEED: ClassVar[float] = 30e6
-    """The supported maximum spi maximum speed."""
-    SPI_BIT_ORDER: ClassVar[str] = 'msb'
-    """The supported spi bit order."""
 
     WIDTH: ClassVar[int] = 128
     """The number of pixels by width."""
@@ -40,12 +31,32 @@ class NHDC12864A1ZFSWFBWHTT:
     REVERT_NORMAL: ClassVar[int] = 0xA4
     """The command to show the result on the display."""
 
+    SPI_MODE: ClassVar[int] = 0b11
+    """The supported spi modes."""
+    MIN_SPI_MAX_SPEED: ClassVar[float] = 5e4
+    """The supported minimum spi maximum speed."""
+    MAX_SPI_MAX_SPEED: ClassVar[float] = 30e6
+    """The supported maximum spi maximum speed."""
+    SPI_BIT_ORDER: ClassVar[str] = 'msb'
+    """The supported spi bit order."""
+    A0_PIN_DIRECTION: ClassVar[str] = 'out'
+    """The direction of the a0 pin."""
+    RESET_PIN_DIRECTION: ClassVar[str] = 'out'
+    """The direction of the reset pin."""
+    A0_PIN_INVERTED: ClassVar[bool] = False
+    """The inverted status of A0 pin."""
+    RESET_PIN_INVERTED: ClassVar[bool] = True
+    """The inverted status of reset pin."""
     spi: SPI
     """The SPI for the display device."""
     a0_pin: GPIO
     """The mode select pin for the display device."""
     reset_pin: GPIO
     """The reset pin (active low) for the display device."""
+    _framebuffer: list[int] = field(init=False)
+    _face: Face | None = field(init=False)
+    _font_width: int = field(init=False)
+    _font_height: int = field(init=False)
 
     def __post_init__(self) -> None:
         if self.spi.mode != self.SPI_MODE:
@@ -58,28 +69,28 @@ class NHDC12864A1ZFSWFBWHTT:
             raise ValueError('unsupported spi maximum speed')
         elif self.spi.bit_order != self.SPI_BIT_ORDER:
             raise ValueError('unsupported spi bit order')
+        elif (
+                self.a0_pin.direction != self.A0_PIN_DIRECTION
+                or self.reset_pin.direction != self.RESET_PIN_DIRECTION
+        ):
+            raise ValueError('a0 and reset pin must be set to out')
+        elif (
+                self.a0_pin.inverted != self.A0_PIN_INVERTED
+                or self.reset_pin.inverted != self.RESET_PIN_INVERTED
+        ):
+            raise ValueError('a0 must be active high and reset active low')
 
         if self.spi.extra_flags:
             warn(f'unknown spi extra flags {self.spi.extra_flags}')
 
-        self.framebuffer = [0x0 for i in range(64 * 16)]
-        self.face = None
-        self.font_width = -1
-        self.font_height = -1
+        self._framebuffer = [0x0 for i in range(64 * 16)]
+        self._face = None
+        self._font_width = -1
+        self._font_height = -1
 
-    def reset(self) -> None:
-        """Resets everything in the display.
+        self._configure()
 
-        :return: ``None``.
-        """
-        self.reset_pin.write(False)
-        self.reset_pin.write(True)
-
-    def configure(self) -> None:
-        """Configures the diplay for normal operation.
-
-        :return: ``None``.
-        """
+    def _configure(self) -> None:
         self.reset()
         self.a0_pin.write(False)
         self.spi.transfer(
@@ -96,13 +107,21 @@ class NHDC12864A1ZFSWFBWHTT:
             ]
         )
 
+    def reset(self) -> None:
+        """Resets everything in the display.
+
+        :return: ``None``.
+        """
+        self.reset_pin.write(True)
+        self.reset_pin.write(False)
+
     def clear_screen(self) -> None:
         """Clears the framebuffer and the display.
 
         :return: ``None``.
         """
-        for i in range(len(self.framebuffer)):
-            self.framebuffer[i] = 0x00
+        for i in range(len(self._framebuffer)):
+            self._framebuffer[i] = 0x00
 
         self.display()
 
@@ -122,7 +141,7 @@ class NHDC12864A1ZFSWFBWHTT:
             self.a0_pin.write(True)
             self.spi.transfer(
                 [
-                    self.framebuffer[i + index * self.WIDTH]
+                    self._framebuffer[i + index * self.WIDTH]
                     for i in range(self.WIDTH)
                 ],
             )
@@ -166,7 +185,7 @@ class NHDC12864A1ZFSWFBWHTT:
         :return: ``None``.
         """
         i = self.framebuffer_offset(x, y)
-        self.framebuffer[i] = self.framebuffer[i] | (1 << (y % 8))
+        self._framebuffer[i] = self._framebuffer[i] | (1 << (y % 8))
 
     def write_pixel_immediate(self, x: int, y: int) -> None:
         """Write to framebuffer and update display.
@@ -181,7 +200,7 @@ class NHDC12864A1ZFSWFBWHTT:
 
         self.spi.transfer([page, 0x10, 0x00])
         self.a0_pin.write(True)
-        self.spi.transfer([self.framebuffer[i]])
+        self.spi.transfer([self._framebuffer[i]])
         self.a0_pin.write(False)
 
     def clear_pixel(self, x: int, y: int) -> None:
@@ -194,7 +213,7 @@ class NHDC12864A1ZFSWFBWHTT:
         :return: ``None``.
         """
         i = self.framebuffer_offset(x, y)
-        self.framebuffer[i] = self.framebuffer[i] & ~(1 << (y % 8))
+        self._framebuffer[i] = self._framebuffer[i] & ~(1 << (y % 8))
 
     def clear_pixel_immediate(self, x: int, y: int) -> None:
         """Write to framebuffer and update display.
@@ -209,7 +228,7 @@ class NHDC12864A1ZFSWFBWHTT:
 
         self.spi.transfer([page, 0x10, 0x00])
         self.a0_pin.write(True)
-        self.spi.transfer([self.framebuffer[i]])
+        self.spi.transfer([self._framebuffer[i]])
         self.a0_pin.write(False)
 
     def draw_fill_rect(self, x: int, y: int, width: int, height: int) -> None:
@@ -260,7 +279,7 @@ class NHDC12864A1ZFSWFBWHTT:
         :param filename: The ``.ttf`` file to set.
         :return: ``None``.
         """
-        self.face = Face(filename)
+        self._face = Face(filename)
 
     def pixel_in_bounds(self, x: int, y: int) -> bool:
         """Checks if the x and y coordinate is
@@ -275,13 +294,13 @@ class NHDC12864A1ZFSWFBWHTT:
         :param height: The height.
         :return: ``None``.
         """
-        if self.face is None:
+        if self._face is None:
             return
 
         # freetype uses 26.6 scaling, so the first 6 lsb are for decimals.
-        self.face.set_char_size(width << 6, height << 6)
-        self.font_width = width
-        self.font_height = height
+        self._face.set_char_size(width << 6, height << 6)
+        self._font_width = width
+        self._font_height = height
 
     def draw_letter(self, letter: str, x: int, y: int) -> None:
         """Draw the letter at position ``(x, y)``.
@@ -291,18 +310,18 @@ class NHDC12864A1ZFSWFBWHTT:
         :return: ``None``.
         """
         if (
-            self.face is None
+            self._face is None
             or (
                 not self.pixel_in_bounds(
-                    x + self.font_width,
-                    y + self.font_height,
+                    x + self._font_width,
+                    y + self._font_height,
                 )
             )
         ):
             return
 
-        self.face.load_char(letter)
-        bitmap = self.face.glyph.bitmap
+        self._face.load_char(letter)
+        bitmap = self._face.glyph.bitmap
 
         for row in range(bitmap.rows):
             for col in range(bitmap.width):
@@ -323,11 +342,11 @@ class NHDC12864A1ZFSWFBWHTT:
         :return: ``None``
         """
         if (
-                self.face is None
+                self._face is None
                 or (
                     not self.pixel_in_bounds(
-                        x + self.font_width,
-                        y + self.font_height,
+                        x + self._font_width,
+                        y + self._font_height,
                     )
                 )
         ):
@@ -337,12 +356,12 @@ class NHDC12864A1ZFSWFBWHTT:
         y_off = y
 
         for letter in word:
-            if y_off + self.font_height >= self.HEIGHT:
+            if y_off + self._font_height >= self.HEIGHT:
                 break
 
-            if x_off + self.font_width >= self.WIDTH:
+            if x_off + self._font_width >= self.WIDTH:
                 x_off = x
-                y_off += self.font_height
+                y_off += self._font_height
 
             self.draw_letter(letter, x_off, y_off)
-            x_off += self.font_width
+            x_off += self._font_width
