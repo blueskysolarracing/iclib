@@ -1,6 +1,14 @@
 Reference
 =========
 
+iclib.a1230 module
+------------------
+
+.. automodule:: iclib.a1230
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 iclib.adc78h89 module
 ---------------------
 
@@ -33,10 +41,34 @@ iclib.mcp4161 module
    :undoc-members:
    :show-inheritance:
 
+iclib.nhd_c12864a1z_fsw_fbw_htt module
+--------------------------------------
+
+.. automodule:: iclib.nhd_c12864a1z_fsw_fbw_htt
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+iclib.rotary_encoder module
+---------------------------
+
+.. automodule:: iclib.rotary_encoder
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 iclib.sn74hcs137 module
 -----------------------
 
 .. automodule:: iclib.sn74hcs137
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+iclib.utilities module
+----------------------
+
+.. automodule:: iclib.utilities
    :members:
    :undoc-members:
    :show-inheritance:

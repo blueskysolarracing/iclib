@@ -2,7 +2,6 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import IntEnum
 from threading import Event, Thread
-from time import sleep
 from typing import Any, ClassVar
 
 from periphery import GPIO
@@ -31,7 +30,7 @@ class RotaryEncoder:
 
         self._thread = Thread(target=self._monitor, daemon=True)
 
-        self._thread.run()
+        self._thread.start()
 
     @property
     def state(self) -> tuple[bool, bool]:
@@ -40,18 +39,25 @@ class RotaryEncoder:
     def _monitor(self) -> None:
         previous_state = self.state
 
-        while not self._stoppage.is_set():
+        while not self._stoppage.wait(self.timeout):
             state = self.state
+
+            # print(state)
+
+            direction: RotaryEncoder.Direction | None
 
             match previous_state, state:
                 case (True, True), (False, True):
-                    self.callback(self.Direction.Clockwise)
+                    direction = self.Direction.Clockwise
                 case (True, True), (True, False):
-                    self.callback(self.Direction.Counterclockwise)
+                    direction = self.Direction.Counterclockwise
+                case _:
+                    direction = None
+
+            if direction is not None:
+                self.callback(direction)
 
             previous_state = state
-
-            sleep(self.timeout)
 
     def stop(self) -> None:
         self._stoppage.set()

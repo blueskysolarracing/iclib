@@ -6,4 +6,5 @@ interrogate~=1.7.0
 mypy~=1.11.0
 python-periphery~=2.4.1
 Sphinx~=7.4.7
+sphinx-rtd-theme~=2.0.0
 twine~=5.1.1

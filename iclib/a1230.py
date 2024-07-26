@@ -98,3 +98,7 @@ class A1230:
         :return: The OUTPUTB frequency (in Hz).
         """
         return self.outputb_frequency_monitor.frequency
+
+    def stop(self) -> None:
+        self.outputa_frequency_monitor.stop()
+        self.outputb_frequency_monitor.stop()

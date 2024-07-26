@@ -89,7 +89,6 @@ Below shows a sample usage of NHD-C12864A1Z-FSW-FBW-HTT.
    not_reset = GPIO('/dev/gpiochip0', 9, 'out')
    display = NHDC12864A1ZFSWFBWHTT(spi, a0, not_reset)
 
-   display.configure()
    display.clear_screen()
 
    display.draw_rect(0, 0, 127, 63)
