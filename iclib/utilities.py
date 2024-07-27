@@ -114,6 +114,7 @@ class FrequencyMonitor:
 
         while not self._stoppage.is_set():
             if self.gpio.poll(self.poll_timeout):
+                self.gpio.read_event()
                 timestamps.append(time())
 
                 if len(timestamps) > 1:
