@@ -2,7 +2,8 @@
 
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-from typing import ClassVar
+from time import sleep
+from typing import cast, ClassVar
 
 from periphery import GPIO, I2C
 
@@ -245,7 +246,7 @@ class RegisterBit(tuple[Register, int], Enum):
 @dataclass
 class NAU7802:
     """A Python driver for Nuvoton NAU7802 24-Bit Dual-Channel ADC."""
-    
+
     DRDY_DIRECTION: ClassVar[str] = 'in'
     """The DRDY GPIO direction."""
     DRDY_INVERTED: ClassVar[bool] = False
@@ -256,6 +257,8 @@ class NAU7802:
     """The DRDY GPIO."""
     i2c: I2C
     """The I2C for the ADC device."""
+    timeout: float = 0.01
+    """Timeout for sampling."""
 
     def __post_init__(self) -> None:
         if (self.drdy_gpio.direction != self.DRDY_DIRECTION):
@@ -268,7 +271,6 @@ class NAU7802:
 
         :return: Stored value of register.
         """
-
         device_address_byte = (self.DEVICE_ADDRESS << 1) | 0
         messages = [I2C.Message([register])]
         self.i2c.transfer(device_address_byte, messages)
@@ -277,15 +279,13 @@ class NAU7802:
         received_messages = [I2C.Message([0x00]*data_byte_count, read=True)]
         self.i2c.transfer(device_address_byte, received_messages)
 
-        return received_messages[0].data[0:data_byte_count]
-
+        return cast(list[int], received_messages[0].data[0:data_byte_count])
 
     def write(self, register: Register, data_bytes: list[int]) -> None:
         """Write to register.
 
         :return: ``None``.
         """
-
         device_address_byte = (self.DEVICE_ADDRESS << 1) | 0
         messages = [I2C.Message([register, *data_bytes])]
         self.i2c.transfer(device_address_byte, messages)
@@ -295,61 +295,69 @@ class NAU7802:
 
         :return: Value of bit.
         """
+        (data_byte,) = self.read(register, 1)
 
-        (data_byte,) = self.read(register)
-        
         return bool(data_byte & (1 << bit))
 
-    def write_bit(self, register: Register, bit: int, value: bool,) -> None:
+    def write_bit(self, register: Register, bit: int, value: bool) -> None:
         """Write to a specific bit of a register.
 
         :return: ``None``.
         """
-
-        (data_byte,) = self.read(register)
+        (data_byte,) = self.read(register, 1)
 
         if bool(data_byte & (1 << bit)) != value:
             data_byte ^= 1 << bit
 
             self.write(register, [data_byte])
 
-    def reset(self) -> None: 
+    def reset(self) -> None:
         """Reset and perform power-on sequencing.
 
         :return: ``None``.
         """
+        self.write_bit(*RegisterBit.PU_CTRL_RR, True)  # type: ignore[call-arg]
+        self.write_bit(  # type: ignore[call-arg]
+            *RegisterBit.PU_CTRL_RR,
+            False,
+        )
+        self.write_bit(  # type: ignore[call-arg]
+            *RegisterBit.PU_CTRL_PUD,
+            True,
+        )
 
-        self.write_bit(*RegisterBit.PU_CTRL_RR, 1)
-        self.write_bit(*RegisterBit.PU_CTRL_RR, 0)
-        self.write_bit(*RegisterBit.PU_CTRL_PUD, 1)
+        while self.read_bit(*RegisterBit.PU_CTRL_PUR) != 1:
+            sleep(self.timeout)
 
-        while (self.read_bit(*RegisterBit.PU_CTRL_PUR) != 1):
-            pass
-
-        self.write_bit(*RegisterBit.PU_CTRL_CS, 1)
+        self.write_bit(*RegisterBit.PU_CTRL_CS, True)  # type: ignore[call-arg]
 
     def select_channel(self, channel: int) -> None:
         """Select input channel.
 
         :return: ``None``.
         """
-        
         assert (channel == 1 or channel == 2), "invalid input channel"
-        
+
         if channel == 1:
-            self.write_bit(*RegisterBit.CTRL2_CHS, 0)
+            self.write_bit(  # type: ignore[call-arg]
+                *RegisterBit.CTRL2_CHS,
+                False,
+            )
         elif channel == 2:
-            self.write_bit(*RegisterBit.CTRL2_CHS, 1)
+            self.write_bit(  # type: ignore[call-arg]
+                *RegisterBit.CTRL2_CHS,
+                True,
+            )
 
     def sample(self) -> int:
-        """Return ADC conversion result when conversion is complete and 
+        """Return ADC conversion result when conversion is complete and
         new data are available for readout.
 
         :return: Conversion result.
         """
-        
-        while (self.drdy_gpio.read() == False):
-            pass
+        while not self.drdy_gpio.read():
+            sleep(self.timeout)
 
         adc_value = self.read(Register.ADCO_B2, 3)
+
         return adc_value[0] << 16 | adc_value[1] << 8 | adc_value[0]
