@@ -94,15 +94,15 @@ class MCP23S17TestCase(TestCase):
         mock_spi.clear_calls()
         mock_spi.reset_mock()
         self.assertEqual(
-            mcp23s17.read_register(Port.PORTB, Register.INTCON),  # TODO
+            mcp23s17.write_register(Port.PORTB, Register.INTCON, [0b10101010]),  # TODO
             [0b00000000],
         )
-        mock_spi.transfer.assert_called_once_with([0b01000001, 0x09, 0xFF])
+        mock_spi.transfer.assert_called_once_with([0b01000000, 0x09, 0xAA])
         mock_spi.reset_mock()
 
         mcp23s17.mode = Mode.EIGHT_BIT_MODE
 
-        mock_spi.transfer.assert_has_calls(
+        mock_spi.transfer.assert_has_calls( 
             [
                 call([0b01000001, 0x0A, 0xFF]),
                 call([0b01000000, 0x0A, 0b10000000]),
@@ -111,17 +111,17 @@ class MCP23S17TestCase(TestCase):
         mock_spi.reset_mock()
 
         self.assertEqual(
-            mcp23s17.read_register(Port.PORTA, Register.INTCON),  # TODO
+            mcp23s17.write(Port.PORTA, Register.INTCON, [0b10101010]),  # TODO
             [0b00000000],
         )
-        mock_spi.transfer.assert_called_once_with([0b01000001, 0x04, 0xFF])
+        mock_spi.transfer.assert_called_once_with([0b01000000, 0x04, 0xAA])
         mock_spi.clear_calls()
         mock_spi.reset_mock()
         self.assertEqual(
-            mcp23s17.read_register(Port.PORTB, Register.INTCON),  # TODO
+            mcp23s17.write(Port.PORTB, Register.INTCON, [0b10101010]),  # TODO
             [0b00000000],
         )
-        mock_spi.transfer.assert_called_once_with([0b01000001, 0x14, 0xFF])
+        mock_spi.transfer.assert_called_once_with([0b01000000, 0x14, 0xAA])
 
 
 if __name__ == '__main__':
