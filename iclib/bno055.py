@@ -17,9 +17,11 @@ i2c3_sda_pin = 203
 i2c3_scl_pin = 201
 '''
 
-"""This Module """
+"""This module implements the BNO055 driver"""
      
 from periphery import I2C, GPIO
+from dataclasses import dataclass
+from enum import IntEnum, Enum, auto
 from time import sleep
 import logging
 
@@ -28,65 +30,71 @@ logger = logging.getLogger(__name__)
 
 i2c = I2C("/dev/i2c-3") #run i2cdetect -l to find available i2c bus, this case shoudl be 3? CONFIRM
 
+class Register(IntEnum):
+    BNO055_ADDR = 0x28 #COM3 is connected to ground
+    OPR_MODE_REG = 0x3D #register for operation mode
+    NDOF_MODE = 0x0C #
+    UNIT_SEL_REG = 0x3B
+    UNIT_MODE = 0x00
+    ACC_DATA_X_LSB = 0x08
+    MAG_DATA_X_LSB = 0x0E
+    GYR_DATA_X_LSB = 0x14
+    EUL_DATA_X_LSB = 0x1A
+    QUA_DATA_W_LSB = 0x20
+    LIA_DATA_X_LSB = 0x28
+    GRV_DATA_X_LSB = 0x2E
+    TEMP = 0x34
+    CALIB_STAT_REG = 0x35
 
+    def __init__(self, address: int, name: str, size: int) -> None:
+        self.address = address
+        self.__name = name
+        self.size = size
 
 
 
 gpio_out_imu_reset = GPIO("/dev/gpiochip4",21,"out") #SENSOR_IMU_RST pin on toradex
-BNO055_ADDR = 0x28 #COM3 is connected to ground
-OPR_MODE_REG = 0x3D #register for operation mode
-NDOF_MODE = 0x0C #
-UNIT_SEL_REG = 0x3B
-UNIT_MODE = 0x00
-ACC_DATA_X_LSB = 0x08
-MAG_DATA_X_LSB = 0x0E
-GYR_DATA_X_LSB = 0x14
-EUL_DATA_X_LSB = 0x1A
-QUA_DATA_W_LSB = 0x20
-LIA_DATA_X_LSB = 0x28
-GRV_DATA_X_LSB = 0x2E
-TEMP = 0x34
-CALIB_STAT_REG = 0x35
+
+
+class BNO055:
 
 
 
+    def write(self, register: Register, data) -> int:
+        try:
+            msg = I2C.Message([register, data], read=False)
+            i2c.transfer(BNO055_ADDR, [msg])
+        except IOError as e:
+            logger.error(f"I2C write error: {e}")
+            raise
 
-def write_register(register, data):
-    try:
-        msg = I2C.Message([register, data], read=False)
-        i2c.transfer(BNO055_ADDR, [msg])
-    except IOError as e:
-        logger.error(f"I2C write error: {e}")
-        raise
+    def read(self, register: Register, length=1) -> int:
+        try:
+            write_msg = I2C.Message([register], read=False)
+            read_msg = I2C.Message([0x00]*length, read=True)
+            i2c.transfer(BNO055_ADDR, [write_msg, read_msg])
+            return read_msg.data
+        except IOError as e:
+            logger.error(f"I2C read error: {e}")
+            raise
 
-def read_register(register, length=1):
-    try:
-        write_msg = I2C.Message([register], read=False)
-        read_msg = I2C.Message([0x00]*length, read=True)
-        i2c.transfer(BNO055_ADDR, [write_msg, read_msg])
-        return read_msg.data
-    except IOError as e:
-        logger.error(f"I2C read error: {e}")
-        raise
-
-
-def close():
-    i2c.close()
-    gpio_out_imu_reset.close()
+    def close(self):
+        i2c.close()
+        gpio_out_imu_reset.close()
 
 
-def reset():
-    gpio_out_imu_reset.write(False)
-    sleep(0.05)
-    gpio_out_imu_reset.write(True)
-    logger.info("reset")
+    def reset(self):
+        gpio_out_imu_reset.write(False)
+        sleep(0.05)
+        gpio_out_imu_reset.write(True)
+        logger.info("reset")
 
-
-def set_op_mode():
-    #page 22 for all possible operation modes
-    write_register(OPR_MODE_REG, NDOF_MODE)
-    sleep(0.05)
-    logger.info("operation mode set")
+    @property
+    def set_op_mode(self):
+        #page 22 for all possible operation modes
+        self.write(OPR_MODE_REG, NDOF_MODE)
+        sleep(0.05)
+        logger.info("operation mode set")
 
 def set_units():
     # Set acceleration to m/s^2, angular rate to dps, Euler angles to degrees, temp to Celsius
