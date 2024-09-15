@@ -31,6 +31,87 @@ logger = logging.getLogger(__name__)
 i2c = I2C("/dev/i2c-3") #run i2cdetect -l to find available i2c bus, this case shoudl be 3? CONFIRM
 
 class Register(IntEnum):
+    CHIP_ID = 0x00
+    "Chip Identification Code"
+    ACC_ID= 0x01
+    """Chip ID of accelerometer Device"""
+    MAG_ID = 0x02
+    """Chip ID of magnetometer Device"""
+    GYR_ID = 0x03
+    """Chip ID of gyroscope device"""
+    SW_REV_ID_LSB = 0x04
+    """Lower Byte of SW Revision ID"""
+    SW_REV_ID_MSB = 0x05
+    """Upper Byte of SW Revision ID"""
+    BL_REV_ID = 0x06
+    """Identifies the version of the bootloader in the microcontroller"""
+    PAGE_ID = 0x07
+    """Number of currently selected page"""
+    ACC_DATA_X_LSB = 0x08
+    """Lower byte of x-axis acceleration data"""
+    ACC_DATA_X_MSB = 0x09
+    """Upper byte of x-axis acceleration data"""
+    ACC_DATA_Y_LSB = 0x0A
+    """Lower byte of Y axis acceleration data"""
+    ACC_DATA_Y_MSB = 0x0B
+    """Upper byte of y-axis acceleration data"""
+    ACC_DATA_Z_LSB = 0x0C
+    """Lower byte of z-axis acceleration data"""
+    ACC_DATA_Z_MSB = 0x0D
+    """Upper byte of z-axis acceleration data"""
+    MAG_DATA_X_LSB = 0x0E
+    """Lower byte of x-axis magnetometer data"""
+    MAG_DATA_X_MSB = 0x0F
+    """Upper byte of x-axis magnetometer data"""
+    MAG_DATA_Y_LSB = 0x10
+    """Lower byte of y-axis magnetometer data"""
+    MAG_DATA_Y_MSB = 0x11
+    """Upper byte of y-axis magnetometer data"""
+    MAG_DATA_Z_LSB = 0x12
+    """Lower byte of z-axis magnetometer data"""
+    MAG_DATA_Z_MSB = 0x13
+    """Upper byte of z-axis magnetometer data"""
+    GYR_DATA_X_LSB = 0x14
+    """Lower byte of x-axis gyroscope data"""
+    GYR_DATA_X_MSB = 0x15
+    """Upper byte of x-axis gyroscope data"""
+    GYR_DATA_Y_LSB = 0x16
+    """Lower byte of y-axis gyroscope data"""
+    GYR_DATA_Y_MSB = 0x17
+    GYR_DATA_Z_LSB = 0x18
+    GYR_DATA_Z_MSB = 0x19
+    EUL_DATA_X_LSB = 0x1A
+    EUL_DATA_X_MSB = 0x1B
+    EUL_DATA_Y_LSB = 0x1C
+    EUL_DATA_Y_MSB = 0x1D
+    EUL_DATA_Z_LSB = 0x1E
+    EUL_DATA_Z_MSB = 0x1F
+    QUA_DATA_W_LSB = 0x20
+    QUA_DATA_W_MSB = 0x21
+    QUA_DATA_X_LSB = 0x22
+    QUA_DATA_X_MSB = 0x23
+    QUA_DATA_Y_LSB = 0x24
+    QUA_DATA_Y_MSB = 0x25
+    QUA_DATA_Z_LSB = 0x26
+    QUA_DATA_Z_MSB = 0x27
+    LIA_DATA_X_LSB = 0x28
+    LIA_DATA_X_MSB = 0x29
+    LIA_DATA_Y_LSB = 0x2A
+    LIA_DATA_Y_MSB = 0x2B
+    LIA_DATA_Z_LSB = 0x2C
+    LIA_DATA_Z_MSB = 0x2D
+    GRV_DATA_X_LSB = 0x2E
+    GRV_DATA_X_MSB = 0x2F
+    GRV_DATA_Y_LSB = 0x30
+    GRV_DATA_Y_MSB = 0x31
+    GRV_DATA_Z_LSB = 0x32
+    GRV_DATA_Z_MSB = 0x33
+    TEMP = 0x34
+    CALIB_STAT = 0x35
+    UNIT_SEL = 0x3B
+    OPR_MODE = 0x3D
+
+
     BNO055_ADDR = 0x28 #COM3 is connected to ground
     OPR_MODE_REG = 0x3D #register for operation mode
     NDOF_MODE = 0x0C #
