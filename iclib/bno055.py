@@ -25,6 +25,8 @@ from enum import IntEnum, Enum, auto
 from time import sleep
 import logging
 
+from iclib.utilities import twos_complement
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -111,7 +113,7 @@ class Register(IntEnum):
     UNIT_SEL = 0x3B
     OPR_MODE = 0x3D
 
-
+    """
     BNO055_ADDR = 0x28 #COM3 is connected to ground
     OPR_MODE_REG = 0x3D #register for operation mode
     NDOF_MODE = 0x0C #
@@ -126,7 +128,7 @@ class Register(IntEnum):
     GRV_DATA_X_LSB = 0x2E
     TEMP = 0x34
     CALIB_STAT_REG = 0x35
-
+    """
     def __init__(self, address: int, name: str, size: int) -> None:
         self.address = address
         self.__name = name
@@ -173,101 +175,144 @@ class BNO055:
     @property
     def set_op_mode(self):
         #page 22 for all possible operation modes
-        self.write(OPR_MODE_REG, NDOF_MODE)
+        self.write(Register.OPR_MODE, NDOF_MODE)
         sleep(0.05)
         logger.info("operation mode set")
 
-def set_units():
-    # Set acceleration to m/s^2, angular rate to dps, Euler angles to degrees, temp to Celsius
-    write_register(UNIT_SEL_REG, UNIT_MODE)
-    sleep(0.05)
-    logger.info("units set")
+    @property
+    def set_units(self):
+        # Set acceleration to m/s^2, angular rate to dps, Euler angles to degrees, temp to Celsius
+        self.write(Register.UNIT_SEL, Register.UNIT_MODE)
+        sleep(0.05)
+        logger.info("units set")
 
-def verify_config():
-    mode = read_register(OPR_MODE_REG, 1)[0] & 0x0F #lower 4 bits of OPR_MODE_REG represent the mode
-    units = read_register(UNIT_SEL_REG, 1)[0] 
-    logger.info(f"Current mode: {mode}, Units config: {units}")
-    return mode == NDOF_MODE and units == UNIT_MODE
+    @property
+    def verify_config(self):
+        mode = self.read(Register.OPR_MODE, 1)[0] & 0x0F #lower 4 bits of OPR_MODE_REG represent the mode
+        units = self.read(Register.UNIT_SEL, 1)[0] 
+        logger.info(f"Current mode: {mode}, Units config: {units}")
+        return mode == NDOF_MODE and units == UNIT_MODE
 
-def check_calibration():
-    calib_status = read_register(CALIB_STAT_REG, 1)[0]
-    sys_calib = (calib_status >> 6) & 0x03
-    gyro_calib = (calib_status >> 4) & 0x03
-    accel_calib = (calib_status >> 2) & 0x03
-    mag_calib = calib_status & 0x03
-    logger.info(f"Calibration - Sys: {sys_calib}/3, Gyro: {gyro_calib}/3, Accel: {accel_calib}/3, Mag: {mag_calib}/3")
-    return sys_calib == 3 and gyro_calib == 3 and accel_calib == 3 and mag_calib == 3
-    
-def initialize():
-    try:
-        reset()
-        sleep(0.1)  # Wait for reset to complete
-        chip_id = read_register(0x00)
-        logger.info(f"chip id: {str(chip_id)}")
-        set_op_mode()
-        set_units()
-        if not verify_config():
-            raise Exception("Failed to set correct mode or units")
-        logger.info("Initialization complete. Waiting for calibration...")
-        while not check_calibration():
-            sleep(1)
-        logger.info("Sensor fully calibrated and ready")
-    except Exception as e:
-        logger.error(f"Initialization failed: {str(e)}")
-        raise
+    @property
+    def check_calibration(self):
+        calib_status = self.read(Register.CALIB_STAT, 1)[0]
+        sys_calib = (calib_status >> 6) & 0x03
+        gyro_calib = (calib_status >> 4) & 0x03
+        accel_calib = (calib_status >> 2) & 0x03
+        mag_calib = calib_status & 0x03
+        logger.info(f"Calibration - Sys: {sys_calib}/3, Gyro: {gyro_calib}/3, Accel: {accel_calib}/3, Mag: {mag_calib}/3")
+        return sys_calib == 3 and gyro_calib == 3 and accel_calib == 3 and mag_calib == 3
+        
+    @property
+    def initialize(self):
+        try:
+            self.reset()
+            sleep(0.1)  # Wait for reset to complete
+            chip_id = self.read(0x00)
+            logger.info(f"chip id: {str(chip_id)}")
+            self.set_op_mode()
+            self.set_units()
+            if not self.verify_config():
+                raise Exception("Failed to set correct mode or units")
+            logger.info("Initialization complete. Waiting for calibration...")
+            while not self.check_calibration():
+                sleep(1)
+            logger.info("Sensor fully calibrated and ready")
+        except Exception as e:
+            logger.error(f"Initialization failed: {str(e)}")
+            raise
             
+    """
+    def twos_comp(val, bits=16):
+        if val & (1 << (bits - 1)):
+            val -= (1 << bits)
+        return val
+    """
+    @property
+    def read_vector(self, register):
+        data = self.read(register, 6)
+        return [
+            twos_complement((data[1] << 8) | data[0]),
+            twos_complement((data[3] << 8) | data[2]),
+            twos_complement((data[5] << 8) | data[4])
+        ]
 
-def twos_comp(val, bits=16):
-    if val & (1 << (bits - 1)):
-        val -= (1 << bits)
-    return val
 
-def read_vector(register):
-    data = read_register(register, 6)
-    return [
-        twos_comp((data[1] << 8) | data[0]),
-        twos_comp((data[3] << 8) | data[2]),
-        twos_comp((data[5] << 8) | data[4])
-    ]
+    """question abt 2s complement"""
+    @property
+    def read_quaternion(self):
+        data_w_lsb = self.read(Register.QUA_DATA_W_LSB, 8)
+        data_w_msb = self.read(Register.QUA_DATA_W_MSB, 8)
+        data_x_lsb = self.read(Register.QUA_DATA_X_LSB, 8)
+        data_x_msb = self.read(Register.QUA_DATA_X_MSB, 8)
+        data_z_lsb = self.read(Register.QUA_DATA_Z_LSB, 8)
+        data_z_msb = self.read(Register.QUA_DATA_Z_MSB, 8)
+        return [
+            twos_complement((data[1] << 8) | data[0]),
+            twos_complement((data[3] << 8) | data[2]),
+            twos_complement((data[5] << 8) | data[4]),
+            twos_complement((data[7] << 8) | data[6])
+        ]
 
-def read_quaternion():
-    data = read_register(QUA_DATA_W_LSB, 8)
-    return [
-        twos_comp((data[1] << 8) | data[0]),
-        twos_comp((data[3] << 8) | data[2]),
-        twos_comp((data[5] << 8) | data[4]),
-        twos_comp((data[7] << 8) | data[6])
-    ]
+    @property
+    def read_temperature(self):
+        return self.read_register(Register.TEMP)[0]
+    
 
-def read_temperature():
-    return read_register(TEMP)[0]
+    """should i return number or list"""
+    @property
+    def read_acceleration(self):
+        accel_x_lsb = [x / 100.0 for x in self.read_vector(Register.ACC_DATA_X_LSB)] #1m/s^2 = 100 lsb
+        accel_y_lsb = [x / 100.0 for x in self.read_vector(Register.ACC_DATA_Y_LSB)]
+        accel_z_lsb = [x / 100.0 for x in self.read_vector(Register.ACC_DATA_Z_LSB)]
+        accel_x_msb = [x / 100.0 for x in self.read_vector(Register.ACC_DATA_X_MSB)] #1m/s^2 = 100 lsb
+        accel_y_msb = [x / 100.0 for x in self.read_vector(Register.ACC_DATA_Y_MSB)]
+        accel_z_msb = [x / 100.0 for x in self.read_vector(Register.ACC_DATA_Z_MSB)]
 
-def read_all_data():
-    accel = [x / 100.0 for x in read_vector(ACC_DATA_X_LSB)] #1m/s^2 = 100 lsb
-    mag = [x / 16.0 for x in read_vector(MAG_DATA_X_LSB)] #1uT = 16 lsb
-    gyro = [x / 16.0 for x in read_vector(GYR_DATA_X_LSB)] #1dps = 16 lsb
-    euler = [x / 16.0 for x in read_vector(EUL_DATA_X_LSB)] #1 degree = 16 lsb
-    quat = [x / (1 << 14) for x in read_quaternion()] #1 LSB = 1/16384
-    lia = [x / 100.0 for x in read_vector(LIA_DATA_X_LSB)] #1m/s^2 = 100 lsb    
-    grv = [x / 100.0 for x in read_vector(GRV_DATA_X_LSB)] #1m/s^2 = 100 lsb
-    temp = read_temperature() #1 degree = 1 lsb
+        return{[accel_x_msb, accel_x_lsb], [accel_y_msb, accel_y_lsb], [accel_z_msb, accel_z_lsb]}
 
-    return {
-        'acceleration': accel,
-        'magnetometer': mag,
-        'gyroscope': gyro,
-        'euler': euler,
-        'quaternion': quat,
-        'linear_acceleration': lia,
-        'gravity': grv,
-        'temperature': temp
-    }
+    @property
+    def read_gyro(self):
+        gyro_x_lsb = [x / 16.0 for x in self.read_vector(Register.GYR_DATA_X_LSB)]
+        gyro_y_lsb = [x / 16.0 for x in self.read_vector(Register.GYR_DATA_Y_LSB)]
+        gyro_z_lsb = [x / 16.0 for x in self.read_vector(Register.GYR_DATA_Z_LSB)]
+        gyro_x_msb = [x / 16.0 for x in self.read_vector(Register.GYR_DATA_X_MSB)]
+        gyro_y_msb = [x / 16.0 for x in self.read_vector(Register.GYR_DATA_Y_MSB)]
+        gyro_z_msb = [x / 16.0 for x in self.read_vector(Register.GYR_DATA_Z_MSB)]
+
+        return{[gyro_x_msb, gyro_x_lsb], [gyro_y_msb, gyro_y_lsb], [gyro_z_msb, gyro_z_lsb]}
+
+
+    @property
+    def read_all_data(self):
+        """
+        accel_x = [x / 100.0 for x in self.read_vector(Register.ACC_DATA_X_LSB)] #1m/s^2 = 100 lsb
+        mag_x = [x / 16.0 for x in self.read_vector(MAG_DATA_X_LSB)] #1uT = 16 lsb
+        gyro_x = [x / 16.0 for x in self.read_vector(GYR_DATA_X_LSB)] #1dps = 16 lsb
+        euler = [x / 16.0 for x in read_vector(EUL_DATA_X_LSB)] #1 degree = 16 lsb
+        quat = [x / (1 << 14) for x in read_quaternion()] #1 LSB = 1/16384
+        lia = [x / 100.0 for x in read_vector(LIA_DATA_X_LSB)] #1m/s^2 = 100 lsb    
+        grv = [x / 100.0 for x in read_vector(GRV_DATA_X_LSB)] #1m/s^2 = 100 lsb
+        temp = read_temperature() #1 degree = 1 lsb
+
+        return {
+            'acceleration': accel,
+            'magnetometer': mag,
+            'gyroscope': gyro,
+            'euler': euler,
+            'quaternion': quat,
+            'linear_acceleration': lia,
+            'gravity': grv,
+            'temperature': temp
+        }
+        """
+        return{self.read_acceleration(), self.read_quaternion(), self.read_gyro()}
 
 def main():
     try:
-        initialize()
+        BNO055.initialize()
         while True:
-            data = read_all_data()
+            data = BNO055.read_all_data()
             print("Acceleration (m/s^2):", data['acceleration'])
             print("Magnetometer (uT):", data['magnetometer'])
             print("Gyroscope (dps):", data['gyroscope'])
