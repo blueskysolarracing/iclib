@@ -94,7 +94,7 @@ class MCP23S17TestCase(TestCase):
         mock_spi.clear_calls()
         mock_spi.reset_mock()
         self.assertEqual(
-            mcp23s17.write_register(Port.PORTB, Register.INTCON, [0b10101010]),  # TODO
+            mcp23s17.write_register(Port.PORTB, Register.INTCON, [0b10101010]),
             [0b00000000],
         )
         mock_spi.transfer.assert_called_once_with([0b01000000, 0x09, 0xAA])
@@ -111,14 +111,14 @@ class MCP23S17TestCase(TestCase):
         mock_spi.reset_mock()
 
         self.assertEqual(
-            mcp23s17.write(Port.PORTA, Register.INTCON, [0b10101010]),  # TODO
+            mcp23s17.write(Port.PORTA, Register.INTCON, [0b10101010]),
             [0b00000000],
         )
         mock_spi.transfer.assert_called_once_with([0b01000000, 0x04, 0xAA])
         mock_spi.clear_calls()
         mock_spi.reset_mock()
         self.assertEqual(
-            mcp23s17.write(Port.PORTB, Register.INTCON, [0b10101010]),  # TODO
+            mcp23s17.write(Port.PORTB, Register.INTCON, [0b10101010]),
             [0b00000000],
         )
         mock_spi.transfer.assert_called_once_with([0b01000000, 0x14, 0xAA])
