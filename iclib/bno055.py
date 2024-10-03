@@ -5,7 +5,9 @@ from enum import IntEnum
 from dataclasses import dataclass
 import logging
 
-from iclib.utilities import twos_complement
+i2c: I2C
+gpio_out_imu_reset: GPIO
+_logger: logging.Logger
 
 
 class Register(IntEnum):
@@ -89,70 +91,72 @@ class Register(IntEnum):
     UNIT_SEL = 0x3B
     OPR_MODE = 0x3D
 
-    BNO055_ADDR = 0x28
-
 
 @dataclass
 class BNO055:
 
-    i2c: I2C
-    gpio_out_imu_reset: GPIO
-    _logger: logging.Logger
+    ADDRESS = 0x28
+    i2c_adress: str
+    gpio_address: str
+    gpio_line: int
 
-    def initialize(self, i2c_address: str, gpio_address: str,
-                   gpio_line: int) -> None:
+    def __init__(self, i2c_address: str, gpio_address: str,
+                 gpio_line: int) -> None:
+        global _logger
+        global i2c
+        global gpio_out_imu_reset
         logging.basicConfig(level=logging.INFO)
-        self._logger = logging.getLogger(__name__)
-        self.i2c = I2C(i2c_address)
-        """str: /dev/i2c-3 in original"""
-        self.gpio_out_imu_reset = GPIO(gpio_address, gpio_line, "out")
-        """/dev/gpiochip4"""
+        _logger = logging.getLogger(__name__)
+        i2c = I2C(i2c_address)
+        """original testing i2c_address: /dev/i2c-3"""
+        gpio_out_imu_reset = GPIO(gpio_address, gpio_line, "out")
+        """original testing gpio_address: /dev/gpiochip4"""
 
     def operation_mode_sel(self) -> None:
         self.write(Register.OPR_MODE, 0x0C)
-        self._logger.info("operation mode set")
-        """write this for NDOF mode: 0x0C"""
+        _logger.info("operation mode set")
+        # write this for NDOF mode: 0x0C
 
     def write(self, register: Register, data: int) -> None:
         try:
             msg = I2C.Message([register, data], read=False)
-            self.i2c.transfer(Register.BNO055_ADDR, [msg])
+            i2c.transfer(self.ADDRESS, [msg])
         except IOError as e:
-            self._logger.error(f"I2C write error: {e}")
+            _logger.error(f"I2C write error: {e}")
             raise
 
     def read(self, register: Register,
              length: int) -> list[int]:
         try:
             read_msg = I2C.Message(bytearray(length), read=True)
-            self.i2c.transfer(Register.BNO055_ADDR, [read_msg])
+            i2c.transfer(self.ADDRESS, [read_msg])
             return list(read_msg.data)
         except IOError as e:
-            self._logger.error(f"I2C read error: {e}")
+            _logger.error(f"I2C read error: {e}")
             raise
 
     def close(self) -> None:
-        self.i2c.close()
-        self.gpio_out_imu_reset.close()
+        i2c.close()
+        gpio_out_imu_reset.close()
 
     def reset(self) -> None:
-        self.gpio_out_imu_reset.write(False)
-        self.gpio_out_imu_reset.write(True)
-        self._logger.info("reset")
+        gpio_out_imu_reset.write(False)
+        gpio_out_imu_reset.write(True)
+        _logger.info("reset")
 
     def set_units(self) -> None:
-        """Writing 0x00 into UNIT_SEL selects following:"""
-        """Acceleration: m/s^2"""
-        """Angular rate: dps"""
-        """Temp: Celcius"""
+        "Writing 0x00 into UNIT_SEL selects following:"
+        "Acceleration: m/s^2"
+        "Angular rate: dps"
+        "Temp: Celcius"
         self.write(Register.UNIT_SEL, 0x00)
-        self._logger.info("units set")
+        _logger.info("units set")
 
     def verify_config(self) -> None:
         mode = self.read(Register.OPR_MODE, 1)[0] & 0x0F
         """lower 4 bits of OPR_MODE_REG represent the mode"""
         units = self.read(Register.UNIT_SEL, 1)[0]
-        self._logger.info(f"Current mode: {mode}, Units config: {units}")
+        _logger.info(f"Current mode: {mode}, Units config: {units}")
 
     def check_calibration(self) -> None:
         calib_status = self.read(Register.CALIB_STAT, 1)[0]
@@ -160,27 +164,29 @@ class BNO055:
         gyro_calib = (calib_status >> 4) & 0x03
         accel_calib = (calib_status >> 2) & 0x03
         mag_calib = calib_status & 0x03
-        self._logger.info(
-            f"Calibration - Sys: {sys_calib}/3, " +
-            f"Gyro: {gyro_calib}/3, " +
-            f"Accel: {accel_calib}/3, " +
-            f"Mag: {mag_calib}/3"
+        _logger.info(
+            (
+             f'Calibration - Sys: {sys_calib}/3, '
+             f'Gyro: {gyro_calib}/3, '
+             f'Accel: {accel_calib}/3, '
+             f'Mag: {mag_calib}/3'
+            )
         )
 
     @property
     def calibration_setup(self) -> None:
         try:
             chip_id = self.read(Register.CHIP_ID, 8)
-            self._logger.info(f"chip id: {str(chip_id)}")
+            _logger.info(f"chip id: {str(chip_id)}")
             self.operation_mode_sel()
             self.set_units()
-            self._logger.info(
+            _logger.info(
                 "Initialization complete. Waiting for calibration..."
             )
             self.check_calibration()
-            self._logger.info("Sensor fully calibrated and ready")
+            _logger.info("Sensor fully calibrated and ready")
         except Exception as e:
-            self._logger.error(f"Initialization failed: {str(e)}")
+            _logger.error(f"Initialization failed: {str(e)}")
             raise
 
     def read_quaternion(self) -> list[int]:
