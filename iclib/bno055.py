@@ -5,9 +5,7 @@ from enum import IntEnum
 from dataclasses import dataclass
 import logging
 
-i2c: I2C
-gpio_out_imu_reset: GPIO
-_logger: logging.Logger
+_logger = logging.getLogger(__name__)
 
 
 class Register(IntEnum):
@@ -93,34 +91,112 @@ class Register(IntEnum):
 
 
 @dataclass
+class Operation_Modes(IntEnum):
+    ACCONLY = 0x1
+    MAGONLY = 0x2
+    GYROONLY = 0x3
+    ACCMAG = 0x4
+    ACCGYRO = 0x5
+    MAGGYRO = 0x6
+    AMG = 0x7
+    IMU = 0x8
+    COMPASS = 0x9
+    M4G = 0xA
+    NDOF_FMC_OFF = 0xB
+    NDOF = 0xC
+
+    ms2 = 0x0
+    mg = 0x1
+
+    DPS = 0x0
+    RPS = 0x2
+
+    Degrees = 0x0
+    Radians = 0x4
+
+    C = 0x0
+    F = 0x10
+
+
+@dataclass
 class BNO055:
 
+    i2c: I2C
+    gpio_out_imu_reset: GPIO
+
     ADDRESS = 0x28
-    i2c_adress: str
+    i2c_address: str
     gpio_address: str
     gpio_line: int
+    com_direction: str
 
-    def __init__(self, i2c_address: str, gpio_address: str,
-                 gpio_line: int) -> None:
-        global _logger
-        global i2c
-        global gpio_out_imu_reset
+    @dataclass
+    class Data_Return:
+        @dataclass
+        class Acceleration_Data:
+            x: float
+            y: float
+            z: float
+
+        @dataclass
+        class Gyro_Data:
+            x: float
+            y: float
+            z: float
+
+        @dataclass
+        class Quaternion_Data:
+            x: int
+            w: int
+            z: int
+
+        acceleration: type[Acceleration_Data]
+        quaternion: type[Quaternion_Data]
+        gyro: type[Gyro_Data]
+        temperature: int
+
+    def __post_init__(self) -> None:
         logging.basicConfig(level=logging.INFO)
         _logger = logging.getLogger(__name__)
-        i2c = I2C(i2c_address)
+        self.i2c = I2C(self.i2c_address)
         """original testing i2c_address: /dev/i2c-3"""
-        gpio_out_imu_reset = GPIO(gpio_address, gpio_line, "out")
+
+        if self.com_direction != "out":
+            _logger.error("incorrect direction: should be set out")
+            raise
+
+        self.gpio_out_imu_reset = GPIO(self.gpio_address, self.com_direction)
         """original testing gpio_address: /dev/gpiochip4"""
 
-    def operation_mode_sel(self) -> None:
-        self.write(Register.OPR_MODE, 0x0C)
+    def operation_mode_sel(self, accel: bool, gyro: bool, mag: bool) -> None:
+        if (accel is True and gyro is True and mag is True):
+            self.write(Register.OPR_MODE, Operation_Modes.AMG)
+
+        elif (accel is True and gyro is True):
+            self.write(Register.OPR_MODE, Operation_Modes.ACCGYRO)
+
+        elif (accel is True and mag is True):
+            self.write(Register.OPR_MODE, Operation_Modes.ACCMAG)
+
+        elif (mag is True and gyro is True):
+            self.write(Register.OPR_MODE, Operation_Modes.MAGGYRO)
+
+        elif (accel is True):
+            self.write(Register.OPR_MODE, Operation_Modes.ACCONLY)
+
+        elif (gyro is True):
+            self.write(Register.OPR_MODE, Operation_Modes.GYROONLY)
+
+        elif (mag is True):
+            self.write(Register.OPR_MODE, Operation_Modes.MAGONLY)
+
         _logger.info("operation mode set")
         # write this for NDOF mode: 0x0C
 
     def write(self, register: Register, data: int) -> None:
         try:
             msg = I2C.Message([register, data], read=False)
-            i2c.transfer(self.ADDRESS, [msg])
+            self.i2c.transfer(self.ADDRESS, [msg])
         except IOError as e:
             _logger.error(f"I2C write error: {e}")
             raise
@@ -129,27 +205,62 @@ class BNO055:
              length: int) -> list[int]:
         try:
             read_msg = I2C.Message(bytearray(length), read=True)
-            i2c.transfer(self.ADDRESS, [read_msg])
+            self.i2c.transfer(self.ADDRESS, [read_msg])
             return list(read_msg.data)
         except IOError as e:
             _logger.error(f"I2C read error: {e}")
             raise
 
     def close(self) -> None:
-        i2c.close()
-        gpio_out_imu_reset.close()
+        self.i2c.close()
+        self.gpio_out_imu_reset.close()
 
     def reset(self) -> None:
-        gpio_out_imu_reset.write(False)
-        gpio_out_imu_reset.write(True)
+        self.gpio_out_imu_reset.write(False)
+        self.gpio_out_imu_reset.write(True)
         _logger.info("reset")
 
-    def set_units(self) -> None:
+    def set_units(
+            self,
+            accel_unit: int,
+            ang_rate: int,
+            euler_ang: int,
+            temp: int
+            ) -> None:
         "Writing 0x00 into UNIT_SEL selects following:"
         "Acceleration: m/s^2"
         "Angular rate: dps"
         "Temp: Celcius"
-        self.write(Register.UNIT_SEL, 0x00)
+        if (temp == 0):
+            temp_reg = Operation_Modes.C
+        elif (temp == 1):
+            temp_reg = Operation_Modes.F
+        else:
+            _logger.info("Temperature unit set error")
+
+        if (euler_ang == 0):
+            euler_reg = Operation_Modes.Degrees
+        elif (euler_ang == 1):
+            euler_reg = Operation_Modes.Radians
+        else:
+            _logger.info("Euler Angle unit set error")
+
+        if (ang_rate == 0):
+            rate_reg = Operation_Modes.DPS
+        elif (ang_rate == 1):
+            rate_reg = Operation_Modes.RPS
+        else:
+            _logger.info("Angular rate unit set error")
+
+        if (accel_unit == 0):
+            accel_reg = Operation_Modes.ms2
+        elif (accel_unit == 1):
+            accel_reg = Operation_Modes.mg
+        else:
+            _logger.info("Temperature unit set error")
+
+        input_reg = accel_reg or rate_reg or euler_reg or temp_reg
+        self.write(Register.UNIT_SEL, input_reg)
         _logger.info("units set")
 
     def verify_config(self) -> None:
@@ -158,7 +269,7 @@ class BNO055:
         units = self.read(Register.UNIT_SEL, 1)[0]
         _logger.info(f"Current mode: {mode}, Units config: {units}")
 
-    def check_calibration(self) -> None:
+    def check_calibration(self) -> tuple[int, int, int, int]:
         calib_status = self.read(Register.CALIB_STAT, 1)[0]
         sys_calib = (calib_status >> 6) & 0x03
         gyro_calib = (calib_status >> 4) & 0x03
@@ -172,24 +283,34 @@ class BNO055:
              f'Mag: {mag_calib}/3'
             )
         )
+        return (sys_calib, gyro_calib, accel_calib, mag_calib)
 
-    @property
-    def calibration_setup(self) -> None:
+    def calibration_setup(
+        self, accel: bool, gyro: bool, mag: bool,
+        accel_unit: int, angle_rate_unit: int,
+        euler_ang_unit: int, temp_unit: int
+            ) -> tuple[int, int, int, int]:
         try:
             chip_id = self.read(Register.CHIP_ID, 8)
             _logger.info(f"chip id: {str(chip_id)}")
-            self.operation_mode_sel()
-            self.set_units()
+            self.operation_mode_sel(accel, gyro, mag)
+            self.set_units(
+                    accel_unit,
+                    angle_rate_unit,
+                    euler_ang_unit,
+                    temp_unit
+                )
             _logger.info(
                 "Initialization complete. Waiting for calibration..."
             )
-            self.check_calibration()
+            calibration_status = self.check_calibration()
             _logger.info("Sensor fully calibrated and ready")
+            return calibration_status
         except Exception as e:
-            _logger.error(f"Initialization failed: {str(e)}")
+            _logger.error(f"Initialization failed: {e}")
             raise
 
-    def read_quaternion(self) -> list[int]:
+    def read_quaternion(self) -> type[Data_Return.Quaternion_Data]:
         data_w_lsb = self.read(Register.QUA_DATA_W_LSB, 1)
         data_w_msb = self.read(Register.QUA_DATA_W_MSB, 1)
         data_x_lsb = self.read(Register.QUA_DATA_X_LSB, 1)
@@ -199,16 +320,17 @@ class BNO055:
         data_w_msb[0] = data_w_msb[0] * 256
         data_x_msb[0] = data_x_msb[0] * 256
         data_z_msb[0] = data_z_msb[0] * 256
-        return (
-            [data_w_lsb[0] + data_w_msb[0],
-             data_x_lsb[0] + data_w_msb[0],
-             data_z_lsb[0] + data_z_msb[0]]
-        )
 
-    def read_temperature(self) -> list[int]:
-        return self.read(Register.TEMP, 8)
+        BNO055.Data_Return.Quaternion_Data.w = data_w_lsb[0] + data_w_msb[0]
+        BNO055.Data_Return.Quaternion_Data.x = data_x_lsb[0] + data_x_msb[0]
+        BNO055.Data_Return.Quaternion_Data.z = data_z_lsb[0] + data_z_msb[0]
+        return (BNO055.Data_Return.Quaternion_Data)
 
-    def read_acceleration(self) -> list[float]:
+    def read_temperature(self) -> int:
+        temperature = self.read(Register.TEMP, 1)
+        return temperature[0]
+
+    def read_acceleration(self) -> type[Data_Return.Acceleration_Data]:
         accel_x_lsb = [
             x / 100.0 for x in self.read(Register.ACC_DATA_X_LSB, 1)
         ]
@@ -230,13 +352,23 @@ class BNO055:
         accel_x_msb[0] = accel_x_msb[0] * 256
         accel_y_msb[0] = accel_y_msb[0] * 256
         accel_z_msb[0] = accel_z_msb[0] * 256
-        return (
-            [accel_x_msb[0] + accel_x_lsb[0],
-             accel_y_msb[0] + accel_y_lsb[0],
-             accel_z_msb[0] + accel_z_lsb[0]]
-        )
 
-    def read_gyro(self) -> list[float]:
+        BNO055.Data_Return.Acceleration_Data.x = (
+            accel_x_msb[0] +
+            accel_x_lsb[0]
+            )
+        BNO055.Data_Return.Acceleration_Data.y = (
+            accel_y_msb[0] +
+            accel_y_lsb[0]
+            )
+        BNO055.Data_Return.Acceleration_Data.z = (
+            accel_z_msb[0] +
+            accel_z_lsb[0]
+            )
+
+        return (BNO055.Data_Return.Acceleration_Data)
+
+    def read_gyro(self) -> type[Data_Return.Gyro_Data]:
         gyro_x_lsb = [
             x / 16.0 for x in self.read(Register.GYR_DATA_X_LSB, 1)
         ]
@@ -259,18 +391,19 @@ class BNO055:
         gyro_x_msb[0] = gyro_x_msb[0] * 256
         gyro_y_msb[0] = gyro_y_msb[0] * 256
         gyro_z_msb[0] = gyro_z_msb[0] * 256
-        return (
-            [gyro_x_msb[0] + gyro_x_lsb[0],
-             gyro_y_msb[0] + gyro_y_lsb[0],
-             gyro_z_msb[0] + gyro_z_lsb[0]]
-        )
+
+        BNO055.Data_Return.Gyro_Data.x = gyro_x_msb[0] + gyro_x_lsb[0]
+        BNO055.Data_Return.Gyro_Data.y = gyro_y_msb[0] + gyro_y_lsb[0]
+        BNO055.Data_Return.Gyro_Data.z = gyro_z_msb[0] + gyro_z_lsb[0]
+
+        return (BNO055.Data_Return.Gyro_Data)
 
     @property
-    def read_all_data(self) -> set[object]:
+    def read_all_data(self) -> type[Data_Return]:
         """reads acceleration, quaternion, gyro, and temperature"""
-        return {
-            self.read_acceleration(),
-            self.read_quaternion(),
-            self.read_gyro(),
-            self.read_temperature()
-        }
+
+        BNO055.Data_Return.acceleration = self.read_acceleration()
+        BNO055.Data_Return.quaternion = self.read_quaternion()
+        BNO055.Data_Return.gyro = self.read_gyro()
+        BNO055.Data_Return.temperature = self.read_temperature()
+        return (BNO055.Data_Return)
