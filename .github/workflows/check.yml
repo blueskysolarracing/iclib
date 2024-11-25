@@ -1,0 +1,28 @@
+name: Check Style & Run Tests
+
+on:
+  pull_request:
+    branches:
+      - 'main'
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run style checking
+        run: flake8 iclib
+
+      - name: Run static type checking
+        run: mypy --strict iclib
+
+      - name: Run checks for missing docstrings
+        run: interrogate -f 100 -i -m -n -p -s -r '^\w+TestCase' iclib
+
+      - name: Run unit tests
+        run: python -m unittest
+
+      - name: Run doctests
+        run: python -m doctest iclib/*.py
