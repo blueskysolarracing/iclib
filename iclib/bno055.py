@@ -78,7 +78,6 @@ class Register(IntEnum):
     OPR_MODE: int = 0x3D
 
 
-@dataclass
 class OperationMode(IntEnum):
     ACCONLY: int = 0x1
     MAGONLY: int = 0x2
@@ -94,7 +93,6 @@ class OperationMode(IntEnum):
     NDOF: int = 0xC
 
 
-@dataclass
 class Unit(IntEnum):
     MS2: int = 0x0
     MG: int = 0x1

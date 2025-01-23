@@ -7,7 +7,7 @@ from iclib.bno055 import BNO055, Register, OperationMode
 class BNO055TestCase(TestCase):
     def test_read_register(self) -> None:
         mock_i2c = MagicMock()
-        mock_gpio_out_imu_reset = MagicMock()
+        mock_gpio_out_imu_reset = MagicMock(direction='out')
         mock_message = MagicMock()
 
         mock_message.data.return_value = [0b11111111]
@@ -35,7 +35,7 @@ class BNO055TestCase(TestCase):
 
     def test_write_register(self) -> None:
         mock_i2c = MagicMock()
-        mock_gpio_out_imu_reset = MagicMock()
+        mock_gpio_out_imu_reset = MagicMock(direction='out')
         mock_message = MagicMock()
 
         mock_message.data.return_value = [0b11111111]
@@ -64,7 +64,7 @@ class BNO055TestCase(TestCase):
 
     def test_set_operation_mode(self) -> None:
         mock_i2c = MagicMock()
-        mock_gpio_out_imu_reset = MagicMock()
+        mock_gpio_out_imu_reset = MagicMock(direction='out')
         mock_message = MagicMock()
         bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
         bno055.write = MagicMock()
@@ -79,7 +79,7 @@ class BNO055TestCase(TestCase):
 
     def test_quaternion(self) -> None:
         mock_i2c = MagicMock()
-        mock_gpio_out_imu_reset = MagicMock()
+        mock_gpio_out_imu_reset = MagicMock(direction='out')
         bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
         bno055.read = MagicMock()
 
@@ -100,8 +100,8 @@ class BNO055TestCase(TestCase):
         bno055.read.reset_mock()
 
     def test__get_vector(self) -> None:
-        mock_i2c = MagicMock()
-        mock_gpio_out_imu_reset = MagicMock()
+        mock_i2c = MagicMock(mode='out')
+        mock_gpio_out_imu_reset = MagicMock(direction='out')
         bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
         bno055.read = MagicMock()
 
@@ -119,7 +119,7 @@ class BNO055TestCase(TestCase):
 
     def test_magnetic_field(self) -> None:
         mock_i2c = MagicMock()
-        mock_gpio_out_imu_reset = MagicMock()
+        mock_gpio_out_imu_reset = MagicMock(direction='out')
         bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
 
         bno055.read = MagicMock()
