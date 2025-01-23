@@ -190,3 +190,30 @@ class ManualCSSPI:
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.spi, name)
+
+
+@dataclass
+class LockedSPI:
+    """SPI interface with mutually exclusive access."""
+
+    spi: SPI
+    """The SPI interface."""
+    _lock: Lock = field(init=False, default_factory=Lock)
+
+    def transfer(
+            self,
+            data: bytes | bytearray | list[int],
+    ) -> bytes | bytearray | list[int]:
+        """Transmit and receive data from SPI with mutually exclusive
+        access.
+
+        :param data: The transmitted data.
+        :return: The received data.
+        """
+        with self._lock:
+            received_data = self.spi.transfer(data)
+
+        return received_data
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.spi, name)
