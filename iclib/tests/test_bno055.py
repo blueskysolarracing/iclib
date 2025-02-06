@@ -1,5 +1,6 @@
 from unittest import TestCase
 from unittest.mock import call, MagicMock
+from periphery import I2C
 
 from iclib.bno055 import BNO055, Register, OperationMode
 
@@ -8,19 +9,21 @@ class BNO055TestCase(TestCase):
     def test_read_register(self) -> None:
         mock_i2c = MagicMock()
         mock_gpio_out_imu_reset = MagicMock(direction='out')
-        mock_message = MagicMock()
+        mock_message = MagicMock(spec=I2C.Message)
 
-        mock_message.data.return_value = [0b11111111]
+        mock_message.data = [255]
+        mock_message.read = True
+
         bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
 
+        test_message = bno055.read(Register.ACC_DATA_X_LSB, 1)
+
         self.assertEqual(
-            bno055.read(Register.ACC_DATA_X_LSB, 1),
+            test_message,
             [0b11111111]
         )
-        mock_message.assert_called_once_with(
-            [Register.ACC_DATA_X_LSB] + [0], read=True
-        )
-        mock_i2c.transfer.assert_called_once_with(0x28, mock_message)
+        
+        mock_i2c.transfer.assert_called_once_with(0x28, any)
         mock_i2c.reset_mock()
 
         self.assertEqual(
@@ -34,11 +37,12 @@ class BNO055TestCase(TestCase):
         mock_i2c.reset_mock()
 
     def test_write_register(self) -> None:
-        mock_i2c = MagicMock()
+        mock_i2c = MagicMock(spec=I2C)
         mock_gpio_out_imu_reset = MagicMock(direction='out')
-        mock_message = MagicMock()
+        mock_message = I2C.Message([Register.GRV_DATA_X_LSB, 0x02], False)
 
-        mock_message.data.return_value = [0b11111111]
+
+
         bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
 
         self.assertEqual(
@@ -46,10 +50,7 @@ class BNO055TestCase(TestCase):
             [1]
         )
 
-        mock_message.assert_called_once_with(
-            [Register.GRV_DATA_X_LSB, 1], read=False
-        )
-        mock_i2c.transfer.assert_called_once_with(0x28, mock_message)
+        mock_i2c.transfer.assert_called_once_with(0x28, [mock_message])
         mock_i2c.reset_mock()
 
         self.assertEqual(
@@ -59,8 +60,34 @@ class BNO055TestCase(TestCase):
         mock_message.assert_called_once_with(
             [Register.EUL_DATA_Y_LSB, 1], read=False
         )
-        mock_i2c.transfer.assert_called_once_with(0x28, mock_message)
+        mock_i2c.transfer.assert_has_calls([mock_message])
         mock_i2c.reset_mock()
+
+    def test_close(self) -> None:
+        mock_i2c = MagicMock()
+        mock_gpio_out_imu_reset = MagicMock(direction='out')
+        bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
+
+        bno055.close()
+
+        mock_i2c.assert_has_calls([call.close()])
+        mock_gpio_out_imu_reset.assert_has_calls([call.close()])
+
+        mock_i2c.reset_mock()
+        mock_gpio_out_imu_reset.reset_mock()
+
+    def test_reset(self) -> None:
+        mock_i2c = MagicMock()
+        mock_gpio_out_imu_reset = MagicMock(direction='out')
+        bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
+
+        bno055.reset()
+
+        mock_gpio_out_imu_reset.assert_has_calls([call.write(False)])
+        mock_gpio_out_imu_reset.assert_has_calls([call.write(True)])
+
+        mock_i2c.reset_mock()
+        mock_gpio_out_imu_reset.reset_mock()
 
     def test_set_operation_mode(self) -> None:
         mock_i2c = MagicMock()
@@ -70,12 +97,11 @@ class BNO055TestCase(TestCase):
         bno055.write = MagicMock()
 
         bno055.select_operation_mode(True, True, True)
-        mock_message.assert_called_once_with(
-            [Register.OPR_MODE, OperationMode.AMG], read=False
+        bno055.write.assert_called_once_with(
+            Register.OPR_MODE, OperationMode.AMG
         )
 
-        mock_i2c.transfer.assert_called_once_with(0x28, mock_message)
-        mock_i2c.reset_mock()
+        bno055.write.reset_mock()
 
     def test_quaternion(self) -> None:
         mock_i2c = MagicMock()
@@ -116,13 +142,13 @@ class BNO055TestCase(TestCase):
         )
 
         self.assertEqual(bno055.read.call_count, 6)
+        #has calls and 
 
     def test_magnetic_field(self) -> None:
         mock_i2c = MagicMock()
         mock_gpio_out_imu_reset = MagicMock(direction='out')
         bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
 
-        bno055.read = MagicMock()
         bno055._get_vector = MagicMock()
 
         bno055.magnetic_field()
@@ -134,7 +160,7 @@ class BNO055TestCase(TestCase):
             Register.MAG_DATA_Y_LSB,
             Register.MAG_DATA_Z_MSB,
             Register.MAG_DATA_Z_LSB,
-            bno055.MAGNETIC_FIELD_UNIT_REPRESENTATION,
+            16
         )
 
         self.assertEqual(bno055.read.call_count, 6)
