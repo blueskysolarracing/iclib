@@ -132,11 +132,11 @@ class GPMode(StrEnum):
     on datasheet.
     """
 
-    AUTONOMOUS: str = 'A'
+    AUTONOMOUS = 'A'
     """Autonomous mode"""
-    DIFFERENTIAL: str = 'D'
+    DIFFERENTIAL = 'D'
     """Differential mode"""
-    ESTIMATED: str = 'E'
+    ESTIMATED = 'E'
     """Estimated mode"""
 
 
@@ -152,9 +152,9 @@ class GPGGA(GPLocationDataSentence):
         mode. See table 3 on datasheet.
         """
 
-        NO_FIX: int = 0
-        GPS_FIX: int = 1
-        DIFFERENTIAL_GPS_FIX: int = 2
+        NO_FIX = 0
+        GPS_FIX = 1
+        DIFFERENTIAL_GPS_FIX = 2
 
     MESSAGE_ID: ClassVar[str] = '$GPGGA'
     """The NMEA message ID for the GGA update message."""
@@ -207,9 +207,9 @@ class GPRMC(GPLocationDataSentence):
         on datasheet.
         """
 
-        VALID: str = 'A'
+        VALID = 'A'
         """Data is valid"""
-        INVALID: str = 'V'
+        INVALID = 'V'
         """Data is invalid"""
 
     MESSAGE_ID: ClassVar[str] = '$GPGGA'

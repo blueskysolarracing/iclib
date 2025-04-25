@@ -14,17 +14,17 @@ from iclib.utilities import bit_getter
 class MemoryAddress(IntEnum):
     """The enum class for memory addresses."""
 
-    VOLATILE_WIPER_0: int = 0x00
+    VOLATILE_WIPER_0 = 0x00
     """The volatile wiper 0."""
-    VOLATILE_WIPER_1: int = 0x01
+    VOLATILE_WIPER_1 = 0x01
     """The volatile wiper 0."""
-    NON_VOLATILE_WIPER_0: int = 0x02
+    NON_VOLATILE_WIPER_0 = 0x02
     """The non-volatile wiper 0."""
-    NON_VOLATILE_WIPER_1: int = 0x03
+    NON_VOLATILE_WIPER_1 = 0x03
     """The non-volatile wiper 1."""
-    VOLATILE_TCON_REGISTER: int = 0x04
+    VOLATILE_TCON_REGISTER = 0x04
     """The volatile TCON register."""
-    STATUS_REGISTER: int = 0x05
+    STATUS_REGISTER = 0x05
     """The status register."""
 
 

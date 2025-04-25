@@ -1,10 +1,11 @@
 build~=1.2.2.post1
-coverage~=7.6.10
-flake8~=7.1.1
+coverage~=7.8.0
+flake8~=7.2.0
 freetype-py~=2.5.1
 interrogate~=1.7.0
-mypy~=1.11.0
+mypy~=1.15.0
+python-can~=4.5.0
 python-periphery~=2.4.1
-Sphinx~=8.1.3
+Sphinx~=8.2.3
 sphinx-rtd-theme~=3.0.2
 twine~=6.1.0
