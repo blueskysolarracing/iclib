@@ -17,132 +17,132 @@ class MotorControlBroadcastMessage(ABC):
 @dataclass
 class IdentificationInformation(MotorControlBroadcastMessage):
     message_identifier = 0x00
-    format_ = '>II'
-    serial_number: int
+    format_ = '<II'
     prohelion_id: int
+    serial_number: int
 
 
 @dataclass
 class StatusInformation(MotorControlBroadcastMessage):
     message_identifier = 0x01
-    format_ = '>BBHHH'
-    receive_error_count: int
-    transmit_error_count: int
-    active_motor: int
-    error_flags: int
+    format_ = '<HHHBB'
     limit_flags: int
+    error_flags: int
+    active_motor: int
+    transmit_error_count: int
+    receive_error_count: int
 
 
 @dataclass
 class BusMeasurement(MotorControlBroadcastMessage):
     message_identifier = 0x02
     format_ = '<ff'
-    bus_current: float
     bus_voltage: float
+    bus_current: float
 
 
 @dataclass
 class VelocityMeasurement(MotorControlBroadcastMessage):
     message_identifier = 0x03
     format_ = '<ff'
-    vehicle_velocity: float
     motor_velocity: float
+    vehicle_velocity: float
 
 
 @dataclass
 class PhaseCurrentMeasurement(MotorControlBroadcastMessage):
     message_identifier = 0x04
     format_ = '<ff'
-    phase_c_current: float
     motor_velocity: float
+    phase_c_current: float
 
 
 @dataclass
 class MotorVoltageVectorMeasurement(MotorControlBroadcastMessage):
     message_identifier = 0x05
     format_ = '<ff'
-    Vd: float
     Vq: float
+    Vd: float
 
 
 @dataclass
 class MotorCurrentVectorMeasurement(MotorControlBroadcastMessage):
     message_identifier = 0x06
     format_ = '<ff'
-    Id: float
     Iq: float
+    Id: float
 
 
 @dataclass
 class MotorBackEMFMeasurementPrediction(MotorControlBroadcastMessage):
     message_identifier = 0x07
     format_ = '<ff'
-    BEMFd: float
     BEMFq: float
+    BEMFd: float
 
 
 @dataclass
 class VoltageRailMeasurement15V(MotorControlBroadcastMessage):
     message_identifier = 0x08
     format_ = '<ff'
-    supply_15v: float
     reserved: float
+    supply_15v: float
 
 
 @dataclass
 class VoltageRailMeasurement3_3VAnd1_9V(MotorControlBroadcastMessage):
     message_identifier = 0x09
     format_ = '<ff'
-    supply_3_3v: float
     supply_1_9v: float
+    supply_3_3v: float
 
 
 @dataclass
 class Reserved0(MotorControlBroadcastMessage):
     message_identifier = 0x0A
     format_ = '<ff'
-    reserved_1: float
     reserved_2: float
+    reserved_1: float
 
 
 @dataclass
 class HeatSinkAndMotorTemperatureMeasurement(MotorControlBroadcastMessage):
     message_identifier = 0x0B
     format_ = '<ff'
-    heat_sink_temp: float
     motor_temp: float
+    heat_sink_temp: float
 
 
 @dataclass
 class DSPBoardTemperatureMeasurement(MotorControlBroadcastMessage):
     message_identifier = 0x0C
     format_ = '<ff'
-    reserved: float
     dsp_board_temp: float
+    reserved: float
 
 
 @dataclass
 class Reserved1(MotorControlBroadcastMessage):
     message_identifier = 0x0D
     format_ = '<ff'
-    reserved_1: float
     reserved_2: float
+    reserved_1: float
 
 
 @dataclass
 class OdometerAndBusAmpHoursMeasurement(MotorControlBroadcastMessage):
     message_identifier = 0x0E
     format_ = '<ff'
-    dc_bus_amphours: float
     odometer: float
+    dc_bus_amphours: float
 
 
 @dataclass
 class SlipSpeedMeasurement(MotorControlBroadcastMessage):
     message_identifier = 0x17
     format_ = '<ff'
-    slip_speed: float
     reserved: float
+    slip_speed: float
 
 
 @dataclass
@@ -200,14 +200,14 @@ class WaveSculptor22:
                                rpm type.
         :return: ``None``.
         """
-        self._send(0x1, pack('<ff', motor_current, motor_velocity), timeout)
+        self._send(0x1, pack('<ff', motor_velocity, motor_current), timeout)
 
     def motor_power(
             self,
             bus_current: float,
             timeout: float | None = None,
     ) -> None:
-        self._send(0x2, pack('<ff', bus_current, 0), timeout)
+        self._send(0x2, pack('<ff', 0, bus_current), timeout)
 
     def reset(self, timeout: float | None = None) -> None:
         self._send(0x3, pack('<ff', 0, 0), timeout)
@@ -284,6 +284,6 @@ class WaveSculptor22:
 
         self._send(
             0x12,
-            pack('>H6s', 5, self.CONFIGURATION_ACCESS_KEY),
+            pack('<6sH', self.CONFIGURATION_ACCESS_KEY, 5),
             timeout,
         )
