@@ -36,6 +36,10 @@ def twos_complement(value: int, bit_count: int) -> int:
     """If a value represents a negative number, perform two's complement
     on it.
 
+    >>> bin(twos_complement(0b0101, 4))
+    '0b101'
+    >>> bin(twos_complement(0b1101, 4))
+    '-0b11'
     >>> bin(twos_complement(0b00001011, 8))
     '0b1011'
     >>> bin(twos_complement(0b10001011, 8))
@@ -45,8 +49,8 @@ def twos_complement(value: int, bit_count: int) -> int:
     :param bit_count: The number of bits in the value.
     :return: The negated value.
     """
-    if value & (1 << (bit_count - 1)):
-        value -= (1 << bit_count)
+    sign_bit = (1 << (bit_count - 1))
+    value = (value & (sign_bit - 1)) - (value & sign_bit)
 
     return value
 

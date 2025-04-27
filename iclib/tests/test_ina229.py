@@ -6,7 +6,6 @@ from iclib.ina229 import INA229
 
 class INA229TestCase(TestCase):
     def test_read_register(self) -> None:
-        R_SHUNT = 100
         alert_gpio = MagicMock()
         mock_spi = MagicMock(
             mode=INA229.SPI_MODE,
@@ -14,9 +13,12 @@ class INA229TestCase(TestCase):
             bit_order=INA229.SPI_BIT_ORDER,
             bits_per_word=INA229.SPI_WORD_BIT_COUNT,
             extra_flags=0,
+            transfer=lambda data: [0x00] * len(data),
         )
+        maximum_expected_current = 60
+        R_SHUNT = 0.01
 
-        INA229(R_SHUNT, alert_gpio, mock_spi)
+        INA229(alert_gpio, mock_spi, maximum_expected_current, R_SHUNT)
 
 
 if __name__ == '__main__':
