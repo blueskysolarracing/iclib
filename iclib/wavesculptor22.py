@@ -10,22 +10,22 @@ from can import BusABC, Message
 
 @dataclass
 class MotorControlBroadcastMessage(ABC):
-    message_identifier: ClassVar[int]
-    format_: ClassVar[str]
+    MESSAGE_IDENTIFIER: ClassVar[int]
+    FORMAT: ClassVar[str]
 
 
 @dataclass
 class IdentificationInformation(MotorControlBroadcastMessage):
-    message_identifier = 0x00
-    format_ = '<II'
+    MESSAGE_IDENTIFIER = 0x00
+    FORMAT = '<II'
     prohelion_id: int
     serial_number: int
 
 
 @dataclass
 class StatusInformation(MotorControlBroadcastMessage):
-    message_identifier = 0x01
-    format_ = '<HHHBB'
+    MESSAGE_IDENTIFIER = 0x01
+    FORMAT = '<HHHBB'
     limit_flags: int
     error_flags: int
     active_motor: int
@@ -35,112 +35,112 @@ class StatusInformation(MotorControlBroadcastMessage):
 
 @dataclass
 class BusMeasurement(MotorControlBroadcastMessage):
-    message_identifier = 0x02
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x02
+    FORMAT = '<ff'
     bus_voltage: float
     bus_current: float
 
 
 @dataclass
 class VelocityMeasurement(MotorControlBroadcastMessage):
-    message_identifier = 0x03
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x03
+    FORMAT = '<ff'
     motor_velocity: float
     vehicle_velocity: float
 
 
 @dataclass
 class PhaseCurrentMeasurement(MotorControlBroadcastMessage):
-    message_identifier = 0x04
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x04
+    FORMAT = '<ff'
     motor_velocity: float
     phase_c_current: float
 
 
 @dataclass
 class MotorVoltageVectorMeasurement(MotorControlBroadcastMessage):
-    message_identifier = 0x05
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x05
+    FORMAT = '<ff'
     Vq: float
     Vd: float
 
 
 @dataclass
 class MotorCurrentVectorMeasurement(MotorControlBroadcastMessage):
-    message_identifier = 0x06
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x06
+    FORMAT = '<ff'
     Iq: float
     Id: float
 
 
 @dataclass
 class MotorBackEMFMeasurementPrediction(MotorControlBroadcastMessage):
-    message_identifier = 0x07
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x07
+    FORMAT = '<ff'
     BEMFq: float
     BEMFd: float
 
 
 @dataclass
 class VoltageRailMeasurement15V(MotorControlBroadcastMessage):
-    message_identifier = 0x08
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x08
+    FORMAT = '<ff'
     reserved: float
     supply_15v: float
 
 
 @dataclass
 class VoltageRailMeasurement3_3VAnd1_9V(MotorControlBroadcastMessage):
-    message_identifier = 0x09
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x09
+    FORMAT = '<ff'
     supply_1_9v: float
     supply_3_3v: float
 
 
 @dataclass
 class Reserved0(MotorControlBroadcastMessage):
-    message_identifier = 0x0A
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x0A
+    FORMAT = '<ff'
     reserved_2: float
     reserved_1: float
 
 
 @dataclass
 class HeatSinkAndMotorTemperatureMeasurement(MotorControlBroadcastMessage):
-    message_identifier = 0x0B
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x0B
+    FORMAT = '<ff'
     motor_temp: float
     heat_sink_temp: float
 
 
 @dataclass
 class DSPBoardTemperatureMeasurement(MotorControlBroadcastMessage):
-    message_identifier = 0x0C
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x0C
+    FORMAT = '<ff'
     dsp_board_temp: float
     reserved: float
 
 
 @dataclass
 class Reserved1(MotorControlBroadcastMessage):
-    message_identifier = 0x0D
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x0D
+    FORMAT = '<ff'
     reserved_2: float
     reserved_1: float
 
 
 @dataclass
 class OdometerAndBusAmpHoursMeasurement(MotorControlBroadcastMessage):
-    message_identifier = 0x0E
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x0E
+    FORMAT = '<ff'
     odometer: float
     dc_bus_amphours: float
 
 
 @dataclass
 class SlipSpeedMeasurement(MotorControlBroadcastMessage):
-    message_identifier = 0x17
-    format_ = '<ff'
+    MESSAGE_IDENTIFIER = 0x17
+    FORMAT = '<ff'
     reserved: float
     slip_speed: float
 
@@ -260,11 +260,11 @@ class WaveSculptor22:
         for type_ in self.MOTOR_CONTROL_BROADCAST_MESSAGE_TYPES:
             arbitration_id = (
                 self.driver_controls_base_address
-                + type_.message_identifier
+                + type_.MESSAGE_IDENTIFIER
             )
 
             if message.arbitration_id == arbitration_id:
-                broadcast_message = type_(*unpack(type_.format_, message.data))
+                broadcast_message = type_(*unpack(type_.FORMAT, message.data))
 
                 break
 
