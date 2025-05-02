@@ -18,10 +18,6 @@ class A1230:
     """The OUTPUTA GPIO direction."""
     OUTPUTB_DIRECTION: ClassVar[str] = 'in'
     """The OUTPUTB GPIO direction."""
-    OUTPUTA_EDGE: ClassVar[str] = 'rising'
-    """The OUTPUTA GPIO inverted status."""
-    OUTPUTB_EDGE: ClassVar[str] = 'rising'
-    """The OUTPUTB GPIO inverted status."""
     OUTPUTA_INVERTED: ClassVar[bool] = False
     """The OUTPUTA GPIO inverted status."""
     OUTPUTB_INVERTED: ClassVar[bool] = False
@@ -45,11 +41,6 @@ class A1230:
                 or self.outputb_gpio.direction != self.OUTPUTB_DIRECTION
         ):
             raise ValueError('invalid GPIO direction')
-        elif (
-                self.outputa_gpio.edge != self.OUTPUTA_EDGE
-                or self.outputb_gpio.edge != self.OUTPUTB_EDGE
-        ):
-            raise ValueError('invalid GPIO edge')
         elif (
                 self.outputa_gpio.inverted != self.OUTPUTA_INVERTED
                 or self.outputb_gpio.inverted != self.OUTPUTB_INVERTED

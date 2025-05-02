@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='iclib',
-    version='0.0.0.dev8',
+    version='0.0.0.dev13',
     description='A collection of integrated circuit libraries in pure Python',
     long_description=open('README.rst').read(),
     long_description_content_type='text/x-rst',
@@ -27,13 +27,18 @@ setup(
         'Programming Language :: Python :: 3.12',
     ],
     keywords=[
+        'a1230',
         'adc78h89',
         'ina229',
+        'ltc6810',
         'mcp23s17',
         'mcp4161',
         'microchip technology',
+        'nau7802',
         'newhaven display',
         'nhd-c12864a1z-fsw-fbw-htt',
+        'pa1616s',
+        'pca9546adr',
         'python',
         'sn74hcs137',
         'texas instruments',

@@ -15,21 +15,21 @@ class InputChannel(IntEnum):
     Refer to Table 3, ADC78H89 Datasheet, Page 13.
     """
 
-    AIN1: int = 0b000
+    AIN1 = 0b000
     """The first (default) input channel."""
-    AIN2: int = 0b001
+    AIN2 = 0b001
     """The second input channel."""
-    AIN3: int = 0b010
+    AIN3 = 0b010
     """The third input channel."""
-    AIN4: int = 0b011
+    AIN4 = 0b011
     """The fourth input channel."""
-    AIN5: int = 0b100
+    AIN5 = 0b100
     """The fifth input channel."""
-    AIN6: int = 0b101
+    AIN6 = 0b101
     """The sixth input channel."""
-    AIN7: int = 0b110
+    AIN7 = 0b110
     """The seventh input channel."""
-    GROUND: int = 0b111
+    GROUND = 0b111
     """The ground input channel."""
 
     @property

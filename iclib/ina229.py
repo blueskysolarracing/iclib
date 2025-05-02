@@ -1,8 +1,9 @@
 """This module implements the INA229 driver."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 from enum import Enum, StrEnum
+from time import sleep
 from typing import ClassVar
 from warnings import warn
 
@@ -115,7 +116,6 @@ class SPIFrame(ABC):
 
     def parse_received_data_bytes(self, data_bytes: list[int]) -> int:
         assert len(data_bytes) == self.transmitted_data_byte_count
-        assert not data_bytes[0]
 
         parsed_data = 0
 
@@ -166,17 +166,25 @@ class INA229:
     """The supported spi bit order."""
     SPI_WORD_BIT_COUNT: ClassVar[int] = 8
     """The supported spi number of bits per word."""
-    R_SHUNT: float
-    """The resistance value of the external shunt used to develop the
-    differential voltage across the IN+ and IN- pins."""
     alert_gpio: GPIO
     """The alert GPIO."""
     spi: SPI
     """The SPI."""
-    _ADCRANGE: bool = field(default=False, init=False)
-    _SHUNT_CAL: int = field(default=0x1000, init=False)
+    maximum_expected_current_: InitVar[float]
+    """The maximum expected current."""
+    shunt_resistance_: InitVar[float]
+    """The resistance value of the external shunt used to develop the
+    differential voltage across the IN+ and IN- pins."""
+    _adcrange: bool = field(default=False, init=False)
+    _maximum_expected_current: float = field(init=False)
+    _shunt_resistance: float = field(init=False)
+    _shunt_calibration: int = field(init=False)
 
-    def __post_init__(self) -> None:
+    def __post_init__(
+            self,
+            maximum_expected_current_: float,
+            shunt_resistance_: float,
+    ) -> None:
         if self.spi.mode != self.SPI_MODE:
             raise ValueError('unsupported spi mode')
         elif self.spi.max_speed > self.MAX_SPI_MAX_SPEED:
@@ -189,7 +197,95 @@ class INA229:
         if self.spi.extra_flags:
             warn(f'unknown spi extra flags {self.spi.extra_flags}')
 
-    # Semantic
+        self.maximum_expected_current_and_shunt_resistance = (
+            maximum_expected_current_,
+            shunt_resistance_,
+        )
+
+    @property
+    def maximum_expected_current_and_shunt_resistance(
+            self,
+    ) -> tuple[float, float]:
+        return self._maximum_expected_current, self._shunt_resistance
+
+    @maximum_expected_current_and_shunt_resistance.setter
+    def maximum_expected_current_and_shunt_resistance(
+            self,
+            maximum_expected_current_and_shunt_resistance: tuple[float, float],
+    ) -> None:
+        maximum_expected_current, shunt_resistance = (
+            maximum_expected_current_and_shunt_resistance
+        )
+        self._maximum_expected_current = maximum_expected_current
+        self._shunt_resistance = shunt_resistance
+        shunt_calibration = (
+            13107.2
+            * 1e6
+            * self.current_lsb
+            * self.shunt_resistance
+        )
+
+        if self.adcrange:
+            shunt_calibration *= 4
+
+        self.shunt_calibration = round(shunt_calibration)
+
+    @property
+    def maximum_expected_current(self) -> float:
+        return self._maximum_expected_current
+
+    @maximum_expected_current.setter
+    def maximum_expected_current(
+            self,
+            maximum_expected_current: float,
+    ) -> None:
+        self.maximum_expected_current_and_shunt_resistance = (
+            maximum_expected_current,
+            self.shunt_resistance,
+        )
+
+    @property
+    def shunt_resistance(self) -> float:
+        return self._shunt_resistance
+
+    @shunt_resistance.setter
+    def shunt_resistance(self, shunt_resistance: float) -> None:
+        self.maximum_expected_current_and_shunt_resistance = (
+            self.maximum_expected_current,
+            shunt_resistance,
+        )
+
+    @property
+    def adcrange(self) -> bool:
+        return self._adcrange
+
+    @adcrange.setter
+    def adcrange(self, value: bool) -> None:
+        CONFIG = self.read(Register.CONFIG)
+
+        if bool(CONFIG & (1 << CONFIGRegisterField.ADCRANGE.bit)) != value:
+            CONFIG ^= 1 << CONFIGRegisterField.ADCRANGE.bit
+
+            self.write(Register.CONFIG, CONFIG)
+
+        self._adcrange = value
+        self.maximum_expected_current_and_shunt_resistance = (
+            self.maximum_expected_current_and_shunt_resistance
+        )
+
+    @property
+    def shunt_calibration(self) -> int:
+        return self._shunt_calibration
+
+    @shunt_calibration.setter
+    def shunt_calibration(self, value: int) -> None:
+        self.write(Register.SHUNT_CAL, value)
+
+        self._shunt_calibration = value
+
+    @property
+    def current_lsb(self) -> float:
+        return self.maximum_expected_current / (2 ** 19)
 
     def spi_communicate(self, *spi_frames: SPIFrame) -> list[int]:
         transmitted_data_bytes = []
@@ -227,14 +323,12 @@ class INA229:
         return self.spi_communicate(SPIWriteFrame(register, data))[0]
 
     def reset(self) -> None:
-        data = self.read(Register.CONFIG)
-        data |= 1 << CONFIGRegisterField.RST.bit
-
-        self.write(Register.CONFIG, data)
+        self.write(Register.CONFIG, 1 << CONFIGRegisterField.RST.bit)
+        sleep(60e-6)  # T_POR (Page 6)
 
     @property
     def shunt_voltage(self) -> float:
-        if self.ADCRANGE:
+        if self.adcrange:
             conversion_factor = 78.125
         else:
             conversion_factor = 312.5
@@ -247,11 +341,7 @@ class INA229:
 
     @property
     def bus_voltage(self) -> float:
-        return (
-            195.3125
-            * twos_complement(self.read(Register.VBUS) >> 4, 20)
-            / 1e6
-        )
+        return 195.3125 * (self.read(Register.VBUS) >> 4) / 1e6
 
     @property
     def temperature(self) -> float:
@@ -264,65 +354,21 @@ class INA229:
     @property
     def current(self) -> float:
         return (
-            self.CURRENT_LSB
+            self.current_lsb
             * twos_complement(self.read(Register.CURRENT) >> 4, 20)
         )
 
     @property
     def power(self) -> float:
-        return 3.2 * self.CURRENT_LSB * self.read(Register.POWER)
+        return 3.2 * self.current_lsb * self.read(Register.POWER)
 
     @property
     def energy(self) -> float:
-        return 16 * 3.2 * self.CURRENT_LSB * self.read(Register.ENERGY)
+        return 16 * 3.2 * self.current_lsb * self.read(Register.ENERGY)
 
     @property
     def charge(self) -> float:
         return (
-            self.CURRENT_LSB
+            self.current_lsb
             * twos_complement(self.read(Register.CHARGE), 40)
         )
-
-    # Non-semantic
-
-    @property
-    def ADCRANGE(self) -> bool:
-        assert (
-            self._ADCRANGE
-            == bool(
-                (
-                    self.read(Register.CONFIG)
-                    & (1 << CONFIGRegisterField.ADCRANGE.bit)
-                ),
-            )
-        )
-
-        return self._ADCRANGE
-
-    @ADCRANGE.setter
-    def ADCRANGE(self, value: bool) -> None:
-        CONFIG = self.read(Register.CONFIG)
-
-        if bool(CONFIG & (1 << CONFIGRegisterField.ADCRANGE.bit)) != value:
-            CONFIG ^= 1 << CONFIGRegisterField.ADCRANGE.bit
-
-            self.write(Register.CONFIG, CONFIG)
-
-    @property
-    def SHUNT_CAL(self) -> int:
-        assert self._SHUNT_CAL == self.read(Register.SHUNT_CAL)
-
-        return self._SHUNT_CAL
-
-    @SHUNT_CAL.setter
-    def SHUNT_CAL(self, value: int) -> None:
-        self.write(Register.SHUNT_CAL, value)
-
-    @property
-    def CURRENT_LSB(self) -> float:
-        SHUNT_CAL = self.SHUNT_CAL
-
-        if self.ADCRANGE:
-            SHUNT_CAL *= 4
-
-        return SHUNT_CAL / (13107.2 * 1e6 * self.R_SHUNT)

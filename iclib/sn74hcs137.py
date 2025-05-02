@@ -10,21 +10,21 @@ from periphery import GPIO
 class Address(IntEnum):
     """The enum class for addresses."""
 
-    Y0: int = 0b000
+    Y0 = 0b000
     """Output 0."""
-    Y1: int = 0b001
+    Y1 = 0b001
     """Output 1."""
-    Y2: int = 0b010
+    Y2 = 0b010
     """Output 2."""
-    Y3: int = 0b011
+    Y3 = 0b011
     """Output 3."""
-    Y4: int = 0b100
+    Y4 = 0b100
     """Output 4."""
-    Y5: int = 0b101
+    Y5 = 0b101
     """Output 5."""
-    Y6: int = 0b110
+    Y6 = 0b110
     """Output 6."""
-    Y7: int = 0b111
+    Y7 = 0b111
     """Output 7."""
 
     @property

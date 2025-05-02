@@ -36,6 +36,10 @@ def twos_complement(value: int, bit_count: int) -> int:
     """If a value represents a negative number, perform two's complement
     on it.
 
+    >>> bin(twos_complement(0b0101, 4))
+    '0b101'
+    >>> bin(twos_complement(0b1101, 4))
+    '-0b11'
     >>> bin(twos_complement(0b00001011, 8))
     '0b1011'
     >>> bin(twos_complement(0b10001011, 8))
@@ -45,8 +49,8 @@ def twos_complement(value: int, bit_count: int) -> int:
     :param bit_count: The number of bits in the value.
     :return: The negated value.
     """
-    if value & (1 << (bit_count - 1)):
-        value -= (1 << bit_count)
+    sign_bit = (1 << (bit_count - 1))
+    value = (value & (sign_bit - 1)) - (value & sign_bit)
 
     return value
 
@@ -93,6 +97,8 @@ class FrequencyMonitor:
     The GPIO can be configured to be triggered on any or both edges.
     """
 
+    GPIO_EDGE: ClassVar[str] = 'both'
+    """The GPIO inverted status."""
     gpio: GPIO
     """The GPIO to be monitored."""
     sample_count: int = field(default=5)
@@ -105,6 +111,9 @@ class FrequencyMonitor:
     _thread: Thread = field(init=False)
 
     def __post_init__(self) -> None:
+        if self.gpio.edge != self.GPIO_EDGE:
+            raise ValueError('invalid GPIO edge')
+
         self._thread = Thread(target=self._monitor, daemon=True)
 
         self._thread.start()
@@ -118,10 +127,14 @@ class FrequencyMonitor:
                 timestamps.append(time())
 
                 if len(timestamps) > 1:
-                    self.frequency = (
-                        (len(timestamps) - 1)
-                        / (timestamps[-1] - timestamps[0])
-                    )
+                    time_difference = timestamps[-1] - timestamps[0]
+
+                    if time_difference:
+                        self.frequency = (
+                            (len(timestamps) - 1)
+                            / 2
+                            / time_difference
+                        )
 
     @property
     def frequency(self) -> float:
@@ -185,6 +198,33 @@ class ManualCSSPI:
         received_data = self.spi.transfer(data)
 
         self.chip_select_gpio.write(False)
+
+        return received_data
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.spi, name)
+
+
+@dataclass
+class LockedSPI:
+    """SPI interface with mutually exclusive access."""
+
+    spi: SPI
+    """The SPI interface."""
+    _lock: Lock = field(init=False, default_factory=Lock)
+
+    def transfer(
+            self,
+            data: bytes | bytearray | list[int],
+    ) -> bytes | bytearray | list[int]:
+        """Transmit and receive data from SPI with mutually exclusive
+        access.
+
+        :param data: The transmitted data.
+        :return: The received data.
+        """
+        with self._lock:
+            received_data = self.spi.transfer(data)
 
         return received_data
 

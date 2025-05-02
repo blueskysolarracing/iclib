@@ -222,6 +222,17 @@ class LTC6810:
 
         return CMD0, CMD1
 
+    def wakeup(self, sleep: bool = True) -> None:
+        """Wake up the serial interface (Page 54).
+
+        :param sleep: Sleep for a required period of time after wakeup.
+        :return: ``None``.
+        """
+        self.spi.transfer([0])
+
+        if sleep:
+            _sleep(10e-6)
+
     class CHMode(Enum):
         """The CH ADC Modes, as defined in Page 63 of datasheet."""
 

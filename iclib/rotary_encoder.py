@@ -10,8 +10,8 @@ from periphery import GPIO
 @dataclass
 class RotaryEncoder:
     class Direction(IntEnum):
-        Clockwise: int = 1
-        Counterclockwise: int = -1
+        Clockwise = 1
+        Counterclockwise = -1
 
     GPIO_DIRECTION: ClassVar[str] = 'in'
     a_gpio: GPIO
