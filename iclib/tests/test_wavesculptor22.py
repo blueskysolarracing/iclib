@@ -12,7 +12,7 @@ class WaveSculptor22TestCase(TestCase):
 
     def test_motor_drive(self) -> None:
         mock_can_bus = MagicMock()
-        wavesculptor22 = WaveSculptor22(mock_can_bus, 40)
+        wavesculptor22 = WaveSculptor22(mock_can_bus, 0x500, 0x400)
 
         wavesculptor22.motor_drive_torque_control_mode(0.2)
 
@@ -36,7 +36,7 @@ class WaveSculptor22TestCase(TestCase):
 
     def test_motor_power(self) -> None:
         mock_can_bus = MagicMock()
-        wavesculptor22 = WaveSculptor22(mock_can_bus, 40)
+        wavesculptor22 = WaveSculptor22(mock_can_bus, 0x500, 0x400)
 
         wavesculptor22.motor_power(1)
 
@@ -50,7 +50,7 @@ class WaveSculptor22TestCase(TestCase):
 
     def test_motor_reset(self) -> None:
         mock_can_bus = MagicMock()
-        wavesculptor22 = WaveSculptor22(mock_can_bus, 40)
+        wavesculptor22 = WaveSculptor22(mock_can_bus, 0x500, 0x400)
 
         wavesculptor22.reset()
 
@@ -61,7 +61,7 @@ class WaveSculptor22TestCase(TestCase):
 
     def test_active_motor_change(self) -> None:
         mock_can_bus = MagicMock()
-        wavesculptor22 = WaveSculptor22(mock_can_bus, 32)
+        wavesculptor22 = WaveSculptor22(mock_can_bus, 0x500, 0x400)
 
         wavesculptor22.active_motor_change(5)
 

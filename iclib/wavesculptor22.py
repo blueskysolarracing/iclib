@@ -1,6 +1,5 @@
 from abc import ABC
 from dataclasses import dataclass
-from functools import cached_property
 from math import copysign
 from struct import pack, unpack
 from typing import ClassVar
@@ -156,26 +155,27 @@ class WaveSculptor22:
         50000,
     )
     can_bus: BusABC
-    device_identifier: int
+    driver_controls_base_address: int
+    motor_controller_base_address: int
 
     def __post_init__(self) -> None:
-        if self.device_identifier not in range(1 << 6):
-            raise ValueError('invalid device identifier')
-
-    @cached_property
-    def driver_controls_base_address(self) -> int:
-        return self.device_identifier << 5
+        if self.driver_controls_base_address not in range(1 << 12):
+            raise ValueError('invalid driver controls base address')
 
     def _send(
             self,
             message_identifier: int,
             data: bytes,
             timeout: float | None = None,
+            base_address: int | None = None,
     ) -> None:
         if len(data) != 8:
             raise ValueError('data is not 8 bytes')
 
-        arbitration_id = self.driver_controls_base_address + message_identifier
+        if base_address is None:
+            base_address = self.driver_controls_base_address
+
+        arbitration_id = base_address + message_identifier
         message = Message(
             arbitration_id=arbitration_id,
             data=data,
@@ -259,7 +259,7 @@ class WaveSculptor22:
 
         for type_ in self.MOTOR_CONTROL_BROADCAST_MESSAGE_TYPES:
             arbitration_id = (
-                self.driver_controls_base_address
+                self.motor_controller_base_address
                 + type_.MESSAGE_IDENTIFIER
             )
 
@@ -284,6 +284,7 @@ class WaveSculptor22:
 
         self._send(
             0x12,
-            pack('<6sH', self.CONFIGURATION_ACCESS_KEY, 5),
+            pack('<6sH', self.CONFIGURATION_ACCESS_KEY, active_motor),
             timeout,
+            self.motor_controller_base_address,
         )

@@ -97,6 +97,8 @@ class FrequencyMonitor:
     The GPIO can be configured to be triggered on any or both edges.
     """
 
+    GPIO_EDGE: ClassVar[str] = 'both'
+    """The GPIO inverted status."""
     gpio: GPIO
     """The GPIO to be monitored."""
     sample_count: int = field(default=5)
@@ -109,6 +111,9 @@ class FrequencyMonitor:
     _thread: Thread = field(init=False)
 
     def __post_init__(self) -> None:
+        if self.gpio.edge != self.GPIO_EDGE:
+            raise ValueError('invalid GPIO edge')
+
         self._thread = Thread(target=self._monitor, daemon=True)
 
         self._thread.start()
@@ -122,10 +127,14 @@ class FrequencyMonitor:
                 timestamps.append(time())
 
                 if len(timestamps) > 1:
-                    self.frequency = (
-                        (len(timestamps) - 1)
-                        / (timestamps[-1] - timestamps[0])
-                    )
+                    time_difference = timestamps[-1] - timestamps[0]
+
+                    if time_difference:
+                        self.frequency = (
+                            (len(timestamps) - 1)
+                            / 2
+                            / time_difference
+                        )
 
     @property
     def frequency(self) -> float:

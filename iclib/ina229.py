@@ -116,7 +116,6 @@ class SPIFrame(ABC):
 
     def parse_received_data_bytes(self, data_bytes: list[int]) -> int:
         assert len(data_bytes) == self.transmitted_data_byte_count
-        assert not data_bytes[0]
 
         parsed_data = 0
 
