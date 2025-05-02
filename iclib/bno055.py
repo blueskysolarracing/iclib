@@ -12,96 +12,96 @@ _logger = getLogger(__name__)
 
 
 class Register(IntEnum):
-    CHIP_ID: int = 0x00
+    CHIP_ID = 0x00
     """Chip Identification Code."""
-    ACC_ID: int = 0x01
+    ACC_ID = 0x01
     """Chip ID of accelerometer Device."""
-    MAG_ID: int = 0x02
+    MAG_ID = 0x02
     """Chip ID of magnetometer Device."""
-    GYR_ID: int = 0x03
+    GYR_ID = 0x03
     """Chip ID of gyroscope device."""
-    SW_REV_ID_LSB: int = 0x04
+    SW_REV_ID_LSB = 0x04
     """Lower Byte of SW Revision ID."""
-    SW_REV_ID_MSB: int = 0x05
+    SW_REV_ID_MSB = 0x05
     """Upper Byte of SW Revision ID."""
-    BL_REV_ID: int = 0x06
+    BL_REV_ID = 0x06
     """Identifies the version of the bootloader in the microcontroller."""
-    PAGE_ID: int = 0x07
+    PAGE_ID = 0x07
     """Number of currently selected page."""
-    ACC_DATA_X_LSB: int = 0x08
-    ACC_DATA_X_MSB: int = 0x09
-    ACC_DATA_Y_LSB: int = 0x0A
-    ACC_DATA_Y_MSB: int = 0x0B
-    ACC_DATA_Z_LSB: int = 0x0C
-    ACC_DATA_Z_MSB: int = 0x0D
-    MAG_DATA_X_LSB: int = 0x0E
-    MAG_DATA_X_MSB: int = 0x0F
-    MAG_DATA_Y_LSB: int = 0x10
-    MAG_DATA_Y_MSB: int = 0x11
-    MAG_DATA_Z_LSB: int = 0x12
-    MAG_DATA_Z_MSB: int = 0x13
-    GYR_DATA_X_LSB: int = 0x14
-    GYR_DATA_X_MSB: int = 0x15
-    GYR_DATA_Y_LSB: int = 0x16
-    GYR_DATA_Y_MSB: int = 0x17
-    GYR_DATA_Z_LSB: int = 0x18
-    GYR_DATA_Z_MSB: int = 0x19
-    EUL_DATA_X_LSB: int = 0x1A
-    EUL_DATA_X_MSB: int = 0x1B
-    EUL_DATA_Y_LSB: int = 0x1C
-    EUL_DATA_Y_MSB: int = 0x1D
-    EUL_DATA_Z_LSB: int = 0x1E
-    EUL_DATA_Z_MSB: int = 0x1F
-    QUA_DATA_W_LSB: int = 0x20
-    QUA_DATA_W_MSB: int = 0x21
-    QUA_DATA_X_LSB: int = 0x22
-    QUA_DATA_X_MSB: int = 0x23
-    QUA_DATA_Y_LSB: int = 0x24
-    QUA_DATA_Y_MSB: int = 0x25
-    QUA_DATA_Z_LSB: int = 0x26
-    QUA_DATA_Z_MSB: int = 0x27
-    LIA_DATA_X_LSB: int = 0x28
-    LIA_DATA_X_MSB: int = 0x29
-    LIA_DATA_Y_LSB: int = 0x2A
-    LIA_DATA_Y_MSB: int = 0x2B
-    LIA_DATA_Z_LSB: int = 0x2C
-    LIA_DATA_Z_MSB: int = 0x2D
-    GRV_DATA_X_LSB: int = 0x2E
-    GRV_DATA_X_MSB: int = 0x2F
-    GRV_DATA_Y_LSB: int = 0x30
-    GRV_DATA_Y_MSB: int = 0x31
-    GRV_DATA_Z_LSB: int = 0x32
-    GRV_DATA_Z_MSB: int = 0x33
-    TEMP: int = 0x34
-    CALIB_STAT: int = 0x35
-    UNIT_SEL: int = 0x3B
-    OPR_MODE: int = 0x3D
+    ACC_DATA_X_LSB = 0x08
+    ACC_DATA_X_MSB = 0x09
+    ACC_DATA_Y_LSB = 0x0A
+    ACC_DATA_Y_MSB = 0x0B
+    ACC_DATA_Z_LSB = 0x0C
+    ACC_DATA_Z_MSB = 0x0D
+    MAG_DATA_X_LSB = 0x0E
+    MAG_DATA_X_MSB = 0x0F
+    MAG_DATA_Y_LSB = 0x10
+    MAG_DATA_Y_MSB = 0x11
+    MAG_DATA_Z_LSB = 0x12
+    MAG_DATA_Z_MSB = 0x13
+    GYR_DATA_X_LSB = 0x14
+    GYR_DATA_X_MSB = 0x15
+    GYR_DATA_Y_LSB = 0x16
+    GYR_DATA_Y_MSB = 0x17
+    GYR_DATA_Z_LSB = 0x18
+    GYR_DATA_Z_MSB = 0x19
+    EUL_DATA_X_LSB = 0x1A
+    EUL_DATA_X_MSB = 0x1B
+    EUL_DATA_Y_LSB = 0x1C
+    EUL_DATA_Y_MSB = 0x1D
+    EUL_DATA_Z_LSB = 0x1E
+    EUL_DATA_Z_MSB = 0x1F
+    QUA_DATA_W_LSB = 0x20
+    QUA_DATA_W_MSB = 0x21
+    QUA_DATA_X_LSB = 0x22
+    QUA_DATA_X_MSB = 0x23
+    QUA_DATA_Y_LSB = 0x24
+    QUA_DATA_Y_MSB = 0x25
+    QUA_DATA_Z_LSB = 0x26
+    QUA_DATA_Z_MSB = 0x27
+    LIA_DATA_X_LSB = 0x28
+    LIA_DATA_X_MSB = 0x29
+    LIA_DATA_Y_LSB = 0x2A
+    LIA_DATA_Y_MSB = 0x2B
+    LIA_DATA_Z_LSB = 0x2C
+    LIA_DATA_Z_MSB = 0x2D
+    GRV_DATA_X_LSB = 0x2E
+    GRV_DATA_X_MSB = 0x2F
+    GRV_DATA_Y_LSB = 0x30
+    GRV_DATA_Y_MSB = 0x31
+    GRV_DATA_Z_LSB = 0x32
+    GRV_DATA_Z_MSB = 0x33
+    TEMP = 0x34
+    CALIB_STAT = 0x35
+    UNIT_SEL = 0x3B
+    OPR_MODE = 0x3D
 
 
 class OperationMode(IntEnum):
-    ACCONLY: int = 0x1
-    MAGONLY: int = 0x2
-    GYROONLY: int = 0x3
-    ACCMAG: int = 0x4
-    ACCGYRO: int = 0x5
-    MAGGYRO: int = 0x6
-    AMG: int = 0x7
-    IMU: int = 0x8
-    COMPASS: int = 0x9
-    M4G: int = 0xA
-    NDOF_FMC_OFF: int = 0xB
-    NDOF: int = 0xC
+    ACCONLY = 0x1
+    MAGONLY = 0x2
+    GYROONLY = 0x3
+    ACCMAG = 0x4
+    ACCGYRO = 0x5
+    MAGGYRO = 0x6
+    AMG = 0x7
+    IMU = 0x8
+    COMPASS = 0x9
+    M4G = 0xA
+    NDOF_FMC_OFF = 0xB
+    NDOF = 0xC
 
 
 class Unit(IntEnum):
-    MS2: int = 0x0
-    MG: int = 0x1
-    DPS: int = 0x0
-    RPS: int = 0x2
-    DEGREES: int = 0x0
-    RADIANS: int = 0x4
-    CELSIUS: int = 0x0
-    FAHRENHEIT: int = 0x10
+    MS2 = 0x0
+    MG = 0x1
+    DPS = 0x0
+    RPS = 0x2
+    DEGREES = 0x0
+    RADIANS = 0x4
+    CELSIUS = 0x0
+    FAHRENHEIT = 0x10
 
 
 @dataclass
