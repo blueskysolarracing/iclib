@@ -162,7 +162,7 @@ class BNO055:
         _logger.info('Operation mode set for BNO055')
 
     def write(self, register: Register, data: int) -> list[int]:
-        message = I2C.Message([register, data], read=False)
+        message = I2C.Message([register, data])
 
         self.i2c.transfer(self.ADDRESS, [message])
 
