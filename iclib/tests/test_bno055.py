@@ -8,8 +8,8 @@ from iclib.bno055 import BNO055, Register, OperationMode
 class BNO055TestCase(TestCase):
     def test_read_register(self) -> None:
         mock_i2c = MagicMock()
-        mock_gpio_out_imu_reset = MagicMock(direction='out')
-        bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
+        mock_imu_reset_gpio = MagicMock(direction='out', inverted=True)
+        bno055 = BNO055(mock_i2c, mock_imu_reset_gpio)
 
         self.assertEqual(bno055.read(Register.ACC_DATA_X_LSB, 1), [0])
         mock_i2c.transfer.assert_called_once_with(
@@ -19,8 +19,8 @@ class BNO055TestCase(TestCase):
 
     def test_write_register(self) -> None:
         mock_i2c = MagicMock(spec=I2C)
-        mock_gpio_out_imu_reset = MagicMock(direction='out')
-        bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
+        mock_imu_reset_gpio = MagicMock(direction='out', inverted=True)
+        bno055 = BNO055(mock_i2c, mock_imu_reset_gpio)
 
         self.assertEqual(bno055.write(Register.GRV_DATA_X_LSB, 1), [1])
         mock_i2c.transfer.assert_called_once_with(
@@ -30,28 +30,29 @@ class BNO055TestCase(TestCase):
 
     def test_close(self) -> None:
         mock_i2c = MagicMock()
-        mock_gpio_out_imu_reset = MagicMock(direction='out')
-        bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
+        mock_imu_reset_gpio = MagicMock(direction='out', inverted=True)
+        bno055 = BNO055(mock_i2c, mock_imu_reset_gpio)
 
         bno055.close()
 
         mock_i2c.assert_has_calls([call.close()])
-        mock_gpio_out_imu_reset.assert_has_calls([call.close()])
+        mock_imu_reset_gpio.assert_has_calls([call.close()])
 
     def test_reset(self) -> None:
         mock_i2c = MagicMock()
-        mock_gpio_out_imu_reset = MagicMock(direction='out')
-        bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
+        mock_imu_reset_gpio = MagicMock(direction='out', inverted=True)
+        bno055 = BNO055(mock_i2c, mock_imu_reset_gpio)
 
         bno055.reset()
 
-        mock_gpio_out_imu_reset.assert_has_calls([call.write(False)])
-        mock_gpio_out_imu_reset.assert_has_calls([call.write(True)])
+        mock_imu_reset_gpio.assert_has_calls(
+            [call.write(True), call.write(False)],
+        )
 
     def test_set_operation_mode(self) -> None:
         mock_i2c = MagicMock()
-        mock_gpio_out_imu_reset = MagicMock(direction='out')
-        bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
+        mock_imu_reset_gpio = MagicMock(direction='out', inverted=True)
+        bno055 = BNO055(mock_i2c, mock_imu_reset_gpio)
         bno055.write = MagicMock()  # type: ignore[method-assign]
 
         bno055.select_operation_mode(True, True, True)
@@ -63,8 +64,8 @@ class BNO055TestCase(TestCase):
 
     def test_quaternion(self) -> None:
         mock_i2c = MagicMock()
-        mock_gpio_out_imu_reset = MagicMock(direction='out')
-        bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
+        mock_imu_reset_gpio = MagicMock(direction='out', inverted=True)
+        bno055 = BNO055(mock_i2c, mock_imu_reset_gpio)
         bno055.read = MagicMock()  # type: ignore[method-assign]
 
         bno055.quaternion
@@ -86,8 +87,8 @@ class BNO055TestCase(TestCase):
 
     def test__get_vector(self) -> None:
         mock_i2c = MagicMock(mode='out')
-        mock_gpio_out_imu_reset = MagicMock(direction='out')
-        bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
+        mock_imu_reset_gpio = MagicMock(direction='out', inverted=True)
+        bno055 = BNO055(mock_i2c, mock_imu_reset_gpio)
         bno055.read = MagicMock()  # type: ignore[method-assign]
 
         bno055._get_vector(
@@ -104,8 +105,8 @@ class BNO055TestCase(TestCase):
 
     def test_magnetic_field(self) -> None:
         mock_i2c = MagicMock()
-        mock_gpio_out_imu_reset = MagicMock(direction='out')
-        bno055 = BNO055(mock_i2c, mock_gpio_out_imu_reset)
+        mock_imu_reset_gpio = MagicMock(direction='out', inverted=True)
+        bno055 = BNO055(mock_i2c, mock_imu_reset_gpio)
         bno055.read = MagicMock()  # type: ignore[method-assign]
 
         bno055.magnetic_field
