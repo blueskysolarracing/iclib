@@ -255,15 +255,16 @@ class WaveSculptor22:
     )
 
     def parse(self, message: Message) -> MotorControlBroadcastMessage | None:
+        device_identifier = message.arbitration_id >> 5
+
+        if self.motor_controller_base_address != device_identifier << 5:
+            return None
+
+        message_identifier = message.arbitration_id & ((1 << 5) - 1)
         broadcast_message = None
 
         for type_ in self.MOTOR_CONTROL_BROADCAST_MESSAGE_TYPES:
-            arbitration_id = (
-                self.motor_controller_base_address
-                + type_.MESSAGE_IDENTIFIER
-            )
-
-            if message.arbitration_id == arbitration_id:
+            if message_identifier == type_.MESSAGE_IDENTIFIER:
                 broadcast_message = type_(*unpack(type_.FORMAT, message.data))
 
                 break
