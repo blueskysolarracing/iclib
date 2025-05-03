@@ -108,8 +108,10 @@ class Unit(IntEnum):
 class BNO055:
     ADDRESS: ClassVar[int] = 0x28
     RESET_TIMEOUT: ClassVar[float] = 0.1
+    IMU_RESET_GPIO_DIRECTION: ClassVar[str] = 'out'
+    IMU_RESET_GPIO_INVERTED: ClassVar[bool] = True
     i2c: I2C
-    gpio_out_imu_reset: GPIO
+    imu_reset_gpio: GPIO
     _acceleration_unit: Unit = field(init=False, default=Unit.MS2)
     _angular_velocity_unit: Unit = field(init=False, default=Unit.DPS)
     _angle_unit: Unit = field(init=False, default=Unit.DEGREES)
@@ -129,8 +131,10 @@ class BNO055:
         z: float
 
     def __post_init__(self) -> None:
-        if self.gpio_out_imu_reset.direction != 'out':
-            raise ValueError('incorrect gpio direction -- should be set out')
+        if self.imu_reset_gpio.direction != self.IMU_RESET_GPIO_DIRECTION:
+            raise ValueError('invalid GPIO direction')
+        elif self.imu_reset_gpio.inverted != self.IMU_RESET_GPIO_INVERTED:
+            raise ValueError('invalid GPIO inverted status')
 
     def select_operation_mode(
             self,
@@ -177,12 +181,12 @@ class BNO055:
 
     def close(self) -> None:
         self.i2c.close()
-        self.gpio_out_imu_reset.close()
+        self.imu_reset_gpio.close()
 
     def reset(self) -> None:
-        self.gpio_out_imu_reset.write(False)
+        self.imu_reset_gpio.write(True)
         sleep(self.RESET_TIMEOUT)
-        self.gpio_out_imu_reset.write(True)
+        self.imu_reset_gpio.write(False)
         _logger.info('Resetting BNO055')
 
     @property
