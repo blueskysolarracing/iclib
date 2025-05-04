@@ -185,11 +185,15 @@ class BNO055:
         self.imu_reset_gpio.close()
 
     def reset(self) -> None:
-        self.write(Register.SYS_TRIG, 0x20)
         self.imu_reset_gpio.write(True)
         sleep(self.RESET_TIMEOUT)
         self.imu_reset_gpio.write(False)
         _logger.info('Resetting BNO055')
+
+    def reset2(self) -> None:
+        self.write(Register.SYS_TRIG, 0x20)
+        sleep(self.RESET_TIMEOUT)
+        _logger.info('Resetting (2) BNO055')
 
     @property
     def acceleration_unit(self) -> Unit:
