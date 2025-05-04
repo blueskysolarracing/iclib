@@ -76,6 +76,8 @@ class Register(IntEnum):
     CALIB_STAT = 0x35
     UNIT_SEL = 0x3B
     OPR_MODE = 0x3D
+    PWR_MODE = 0x3E
+    SYS_TRIG = 0x3F
 
 
 class OperationMode(IntEnum):
