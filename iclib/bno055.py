@@ -109,7 +109,7 @@ class Unit(IntEnum):
 @dataclass
 class BNO055:
     ADDRESS: ClassVar[int] = 0x29
-    RESET_TIMEOUT: ClassVar[float] = 0.1
+    RESET_TIMEOUT: ClassVar[float] = 2.5
     IMU_RESET_GPIO_DIRECTION: ClassVar[str] = 'out'
     IMU_RESET_GPIO_INVERTED: ClassVar[bool] = True
     i2c: I2C
@@ -186,6 +186,7 @@ class BNO055:
         self.imu_reset_gpio.close()
 
     def reset(self) -> None:
+        self.write(Register.SYS_TRIG, 0x20)
         self.imu_reset_gpio.write(True)
         sleep(self.RESET_TIMEOUT)
         self.imu_reset_gpio.write(False)
