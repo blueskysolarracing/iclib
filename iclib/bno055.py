@@ -167,19 +167,18 @@ class BNO055:
 
         _logger.info('Operation mode set for BNO055')
 
-    def write(self, register: Register, data: int) -> list[int]:
+    def write(self, register: Register, data: int) -> None:
         message = I2C.Message([register, data])
 
         self.i2c.transfer(self.ADDRESS, [message])
 
-        return list(message.data)[1:]
-
     def read(self, register: Register, length: int) -> list[int]:
-        message = I2C.Message([register] + [0] * length, read=True)
+        write_message = I2C.Message([register])
+        read_message = I2C.Message([0] * length, read=True)
 
-        self.i2c.transfer(self.ADDRESS, [message])
+        self.i2c.transfer(self.ADDRESS, [write_message, read_message])
 
-        return list(message.data)[1:]
+        return list(read_message.data)
 
     def close(self) -> None:
         self.i2c.close()

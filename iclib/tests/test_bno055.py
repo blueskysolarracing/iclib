@@ -13,8 +13,11 @@ class BNO055TestCase(TestCase):
 
         self.assertEqual(bno055.read(Register.ACC_DATA_X_LSB, 1), [0])
         mock_i2c.transfer.assert_called_once_with(
-            0x28,
-            [mock_i2c.transfer.call_args.args[1][0]],
+            0x29,
+            [
+                mock_i2c.transfer.call_args.args[1][0],
+                mock_i2c.transfer.call_args.args[1][1],
+            ],
         )
 
     def test_write_register(self) -> None:
@@ -22,9 +25,9 @@ class BNO055TestCase(TestCase):
         mock_imu_reset_gpio = MagicMock(direction='out', inverted=True)
         bno055 = BNO055(mock_i2c, mock_imu_reset_gpio)
 
-        self.assertEqual(bno055.write(Register.GRV_DATA_X_LSB, 1), [1])
+        bno055.write(Register.GRV_DATA_X_LSB, 1)
         mock_i2c.transfer.assert_called_once_with(
-            0x28,
+            0x29,
             [mock_i2c.transfer.call_args.args[1][0]],
         )
 
