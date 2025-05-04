@@ -106,7 +106,7 @@ class Unit(IntEnum):
 
 @dataclass
 class BNO055:
-    ADDRESS: ClassVar[int] = 0x28
+    ADDRESS: ClassVar[int] = 0x29
     RESET_TIMEOUT: ClassVar[float] = 0.1
     IMU_RESET_GPIO_DIRECTION: ClassVar[str] = 'out'
     IMU_RESET_GPIO_INVERTED: ClassVar[bool] = True
