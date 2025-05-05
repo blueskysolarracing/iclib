@@ -579,15 +579,11 @@ class MCP23S17:
     class Line:
         mcp23s17: MCP23S17
         port: Port
-        register: Register
         bit: int
         direction: str
         inverted: bool = False
 
         def __post_init__(self) -> None:
-            if self.register != Register.GPIO:
-                raise ValueError('needs to be GPIO register')
-
             match self.direction:
                 case 'in':
                     value = True
@@ -598,13 +594,13 @@ class MCP23S17:
 
             self.mcp23s17.write_bit(
                 self.port,
-                self.register,
+                Register.GPIO,
                 self.bit,
                 value,
             )
 
         def read(self) -> bool:
-            value = self.mcp23s17.read_bit(self.port, self.register, self.bit)
+            value = self.mcp23s17.read_bit(self.port, Register.GPIO, self.bit)
 
             if self.inverted:
                 value = not value
@@ -615,14 +611,13 @@ class MCP23S17:
             if self.inverted:
                 value = not value
 
-            self.mcp23s17.write_bit(self.port, self.register, self.bit, value)
+            self.mcp23s17.write_bit(self.port, Register.GPIO, self.bit, value)
 
     def get_line(
             self,
             port: Port,
-            register: Register,
             bit: int,
             direction: str,
             inverted: bool = False,
     ) -> Line:
-        return self.Line(self, port, register, bit, direction, inverted)
+        return self.Line(self, port, bit, direction, inverted)
