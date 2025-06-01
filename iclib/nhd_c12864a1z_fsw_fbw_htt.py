@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from math import floor
+from time import sleep
 from typing import ClassVar
 from warnings import warn
 
@@ -93,6 +94,7 @@ class NHDC12864A1ZFSWFBWHTT:
     def _configure(self) -> None:
         self.reset()
         self.a0_pin.write(False)
+        sleep(0.01)
         self.spi.transfer(
             [
                 0xA0,              # ADC select.
@@ -104,7 +106,7 @@ class NHDC12864A1ZFSWFBWHTT:
                 0x81,              # Electronic Volume Command (set contrast).
                 0x11,              # Electronic Volume value (contrast value).
                 self.DISPLAY_ON,   # Display ON
-            ]
+            ],
         )
 
     def reset(self) -> None:
@@ -113,6 +115,7 @@ class NHDC12864A1ZFSWFBWHTT:
         :return: ``None``.
         """
         self.reset_pin.write(True)
+        sleep(0.1)
         self.reset_pin.write(False)
 
     def clear_screen(self) -> None:
@@ -135,23 +138,21 @@ class NHDC12864A1ZFSWFBWHTT:
         # Write LCD pixel data
         page = self.BASE_PAGE
         self.spi.transfer([self.DISPLAY_OFF, self.DISPLAY_START_ADDRESS])
-
         for i in range(8):
             self.spi.transfer([page, 0x10, 0x00])
             self.a0_pin.write(True)
-            self.spi.transfer(
-                [
-                    self._framebuffer[i + index * self.WIDTH]
-                    for i in range(self.WIDTH)
-                ],
-            )
+            sleep(0.01)
+            for j in range(self.WIDTH):
+                # write pixel data
+                self.spi.transfer([self._framebuffer[index]])
+                index += 1
+            sleep(0.01)
             self.a0_pin.write(False)
             page += 1
-            index += 1
 
         self.spi.transfer(
             [
-                self.DISPLAY_ON,
+                self.DISPLAY_ON,  # Turn on display.
                 self.TURN_POINTS_ON,
                 self.REVERT_NORMAL,
             ],
@@ -200,7 +201,9 @@ class NHDC12864A1ZFSWFBWHTT:
 
         self.spi.transfer([page, 0x10, 0x00])
         self.a0_pin.write(True)
+        sleep(0.01)
         self.spi.transfer([self._framebuffer[i]])
+        sleep(0.01)
         self.a0_pin.write(False)
 
     def clear_pixel(self, x: int, y: int) -> None:
@@ -228,7 +231,9 @@ class NHDC12864A1ZFSWFBWHTT:
 
         self.spi.transfer([page, 0x10, 0x00])
         self.a0_pin.write(True)
+        sleep(0.01)
         self.spi.transfer([self._framebuffer[i]])
+        sleep(0.01)
         self.a0_pin.write(False)
 
     def draw_fill_rect(self, x: int, y: int, width: int, height: int) -> None:
@@ -260,8 +265,8 @@ class NHDC12864A1ZFSWFBWHTT:
         :return: ``None``
         """
         if (
-                not self.pixel_in_bounds(x, y) or
-                not self.pixel_in_bounds(x + width - 1, y + height - 1)
+                not self.pixel_in_bounds(x, y)
+                or not self.pixel_in_bounds(x + width - 1, y + height - 1)
         ):
             return
 
@@ -310,13 +315,13 @@ class NHDC12864A1ZFSWFBWHTT:
         :return: ``None``.
         """
         if (
-            self._face is None
-            or (
-                not self.pixel_in_bounds(
-                    x + self._font_width,
-                    y + self._font_height,
+                self._face is None
+                or (
+                    not self.pixel_in_bounds(
+                        x + self._font_width,
+                        y + self._font_height,
+                    )
                 )
-            )
         ):
             return
 
