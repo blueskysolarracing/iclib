@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='iclib',
-    version='0.0.0.dev17',
+    version='0.0.0.dev18',
     description='A collection of integrated circuit libraries in pure Python',
     long_description=open('README.rst').read(),
     long_description_content_type='text/x-rst',
