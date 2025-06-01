@@ -211,7 +211,7 @@ class LockedSPI:
 
     spi: SPI
     """The SPI interface."""
-    _lock: Lock = field(init=False, default_factory=Lock)
+    _lock: Lock = field(default_factory=Lock)
 
     def transfer(
             self,
