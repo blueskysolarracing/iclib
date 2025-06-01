@@ -94,20 +94,15 @@ class NHDC12864A1ZFSWFBWHTT:
     def _configure(self) -> None:
         self.reset()
         self.a0_pin.write(False)
-        sleep(0.01)
-        self.spi.transfer(
-            [
-                0xA0,              # ADC select.
-                self.DISPLAY_OFF,  # Display OFF.
-                0xC8,              # COM direction scan.
-                0xA2,              # LCD bias set.
-                0x2F,              # Power Control set.
-                0x26,              # Resistor Ratio Set.
-                0x81,              # Electronic Volume Command (set contrast).
-                0x11,              # Electronic Volume value (contrast value).
-                self.DISPLAY_ON,   # Display ON
-            ],
-        )
+        self.spi.transfer([0xA0])  # ADC select.
+        self.spi.transfer([self.DISPLAY_OFF])  # Display OFF.
+        self.spi.transfer([0xC8])  # COM direction scan.
+        self.spi.transfer([0xA2])  # LCD bias set.
+        self.spi.transfer([0x2F])  # Power Control set.
+        self.spi.transfer([0x26])  # Resistor Ratio Set.
+        self.spi.transfer([0x81])  # Electronic Volume Command (set contrast).
+        self.spi.transfer([0x11])  # Electronic Volume value (contrast value).
+        self.spi.transfer([self.DISPLAY_ON])  # Display ON
 
     def reset(self) -> None:
         """Resets everything in the display.
@@ -137,26 +132,27 @@ class NHDC12864A1ZFSWFBWHTT:
         index = 0
         # Write LCD pixel data
         page = self.BASE_PAGE
-        self.spi.transfer([self.DISPLAY_OFF, self.DISPLAY_START_ADDRESS])
+        self.a0_pin.write(False)
+        self.spi.transfer([self.DISPLAY_OFF])
+        self.spi.transfer([self.DISPLAY_START_ADDRESS])
+
         for i in range(8):
-            self.spi.transfer([page, 0x10, 0x00])
+            self.a0_pin.write(False)
+            self.spi.transfer([page])
+            self.spi.transfer([0x10])
+            self.spi.transfer([0x00])
             self.a0_pin.write(True)
-            sleep(0.01)
+
             for j in range(self.WIDTH):
-                # write pixel data
                 self.spi.transfer([self._framebuffer[index]])
                 index += 1
-            sleep(0.01)
-            self.a0_pin.write(False)
+
             page += 1
 
-        self.spi.transfer(
-            [
-                self.DISPLAY_ON,  # Turn on display.
-                self.TURN_POINTS_ON,
-                self.REVERT_NORMAL,
-            ],
-        )
+        self.a0_pin.write(False)
+        self.spi.transfer([self.DISPLAY_ON])  # Turn on display.
+        self.spi.transfer([self.TURN_POINTS_ON])
+        self.spi.transfer([self.REVERT_NORMAL])
 
     def framebuffer_offset(self, x: int, y: int) -> int:
         """Returns the flattened index in the framebuffer given an ``x``
@@ -199,12 +195,12 @@ class NHDC12864A1ZFSWFBWHTT:
         page = self.BASE_PAGE + self.page_offset(x, y)
         self.write_pixel(x, y)
 
-        self.spi.transfer([page, 0x10, 0x00])
-        self.a0_pin.write(True)
-        sleep(0.01)
-        self.spi.transfer([self._framebuffer[i]])
-        sleep(0.01)
         self.a0_pin.write(False)
+        self.spi.transfer([page])
+        self.spi.transfer([0x10])
+        self.spi.transfer([0x00])
+        self.a0_pin.write(True)
+        self.spi.transfer([self._framebuffer[i]])
 
     def clear_pixel(self, x: int, y: int) -> None:
         """Turn off pixel at ``(x, y)`` in the framebuffer.
@@ -229,12 +225,12 @@ class NHDC12864A1ZFSWFBWHTT:
         page = self.BASE_PAGE + self.page_offset(x, y)
         self.clear_pixel(x, y)
 
-        self.spi.transfer([page, 0x10, 0x00])
-        self.a0_pin.write(True)
-        sleep(0.01)
-        self.spi.transfer([self._framebuffer[i]])
-        sleep(0.01)
         self.a0_pin.write(False)
+        self.spi.transfer([page])
+        self.spi.transfer([0x10])
+        self.spi.transfer([0x00])
+        self.a0_pin.write(True)
+        self.spi.transfer([self._framebuffer[i]])
 
     def draw_fill_rect(self, x: int, y: int, width: int, height: int) -> None:
         """Draw a filled rectangle.
