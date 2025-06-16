@@ -113,7 +113,7 @@ class NHDC12864A1ZFSWFBWHTT:
         sleep(0.1)
         self.reset_pin.write(False)
 
-    def clear_screen(self) -> None:
+    def clear_screen(self, display: bool = True) -> None:
         """Clears the framebuffer and the display.
 
         :return: ``None``.
@@ -121,7 +121,8 @@ class NHDC12864A1ZFSWFBWHTT:
         for i in range(len(self._framebuffer)):
             self._framebuffer[i] = 0x00
 
-        self.display()
+        if display:
+            self.display()
 
     def display(self) -> None:
         """Writes what is in the local framebuffer to the display
