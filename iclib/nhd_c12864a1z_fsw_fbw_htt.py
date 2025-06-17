@@ -134,7 +134,6 @@ class NHDC12864A1ZFSWFBWHTT:
         # Write LCD pixel data
         page = self.BASE_PAGE
         self.a0_pin.write(False)
-        self.spi.transfer([self.DISPLAY_OFF])
         self.spi.transfer([self.DISPLAY_START_ADDRESS])
 
         for i in range(8):
@@ -151,9 +150,6 @@ class NHDC12864A1ZFSWFBWHTT:
             page += 1
 
         self.a0_pin.write(False)
-        self.spi.transfer([self.DISPLAY_ON])  # Turn on display.
-        self.spi.transfer([self.TURN_POINTS_ON])
-        self.spi.transfer([self.REVERT_NORMAL])
 
     def framebuffer_offset(self, x: int, y: int) -> int:
         """Returns the flattened index in the framebuffer given an ``x``
