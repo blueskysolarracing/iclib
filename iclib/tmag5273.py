@@ -5,7 +5,7 @@ from enum import Enum, IntEnum
 
 from periphery import I2C
 
-from iclib.utilities import twos_complement
+from iclib.utilities import twos_complement, bit_getter
 
 
 class Register(IntEnum):
@@ -181,13 +181,18 @@ class TMAH5273:
         self.i2c.close()
 
     def check_crc_error(self, data: list[int], cyc_byte: int) -> int:
-        """
-        Validate data with CRC byte
+        crc = 0xFF
+        msb = bit_getter(7)
 
-        return 0 if matching
-        return 1 if not matching (error)
-        """
-        return 0
+        for b in data:
+            crc ^= (b & 0xFF)
+            for _ in range(8):
+                if msb(crc):
+                    crc = ((crc << 1) & 0xFF) ^ 0x07
+                else:
+                    crc = (crc << 1) & 0xFF
+
+        return 0 if crc == (cyc_byte & 0xFF) else 1
 
     @property
     def channels(self) -> list[float]:
@@ -240,29 +245,33 @@ class TMAH5273:
             raw_value = twos_complement(bytes[0], 8)
             return raw_value / (2 ** 8) * 2 * self.magnetic_range_bound
 
-    def parse_temperature(self, bytes: list[int]) -> float:
-        """
-        TODO
-        Input: raw bytes (either 1 byte: only MSB or 2 bytes: [MSB, LSB])
-        return the temperature according to datasheet 6.5.2.2
-        """
+    def parse_temperature(self, data: list[int]) -> float:
+        TSENS_T0 = 25.0
+        TADC_T0 = 17508
+        TADC_RES = 60.1
+
+        if len(data) == 2:
+            code = twos_complement(((data[0] << 8) | data[1]) & 0xFFFF, 16)
+            return TSENS_T0 + (code - TADC_T0) / TADC_RES
+        if len(data) == 1:
+            code8 = twos_complement(data[0] & 0xFF, 8)
+            return TSENS_T0 + ((256 * code8) - TADC_T0) / (256 * TADC_RES)
+
         return float()
 
     @property
     def angle(self) -> float:
-        """
-        Read the register and then compute the value according to the formula
-        (datasheet 6.5.2.3)
-        """
-        return float()
+        msb = self.read(Register.ANGLE_RESULT_MSB, 1)[0]
+        lsb = self.read(Register.ANGLE_RESULT_LSB, 1)[0]
+        word = ((msb << 8) | lsb) & 0xFFFF
+        int_part = (word >> 4) & 0x1FF
+        frac_part = (word & 0xF) / 16.0
+        return float(int_part) + frac_part
 
     @property
     def magnitude(self) -> float:
-        """
-        Read the register and then compute the value according to the formula
-        (datasheet 6.5.2.3)
-        """
-        return float()
+        code = self.read(Register.MAGNITUDE_RESULT, 1)[0] & 0xFF
+        return (code / (2**7)) * self.magnetic_range_bound
 
     @property
     def crc_enable(self) -> Enable:
