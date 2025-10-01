@@ -139,18 +139,6 @@ class FrequencyMonitor:
 
 @dataclass
 class ContinuousFrequencyMonitor:
-    """
-    Monitor the frequency (Hz) of threshold crossings in a continuous signal.
-
-    Usage:
-        mon = ContinuousFrequencyMonitor(
-            threshold=2.5, period=1.0,
-            edge=ContinuousFrequencyMonitor.Edge.BOTH,
-            sliding_window=True,
-        )
-        mon.update(value)          # returns True on crossing
-        current_hz = mon.frequency # events/sec over last 'period'
-    """
 
     class Edge(IntEnum):
         RISING = 1
@@ -168,26 +156,17 @@ class ContinuousFrequencyMonitor:
     _lock: Lock = field(init=False, default_factory=Lock)
 
     def _prune(self, now: float) -> None:
-        """Remove timestamps older than (now - period) for sliding windows."""
         cutoff = now - self.period
         dq = self._timestamps
         while dq and dq[0] < cutoff:
             dq.popleft()
 
     def _rotate_fixed(self, now: float) -> None:
-        """Rotate the fixed window when its period has elapsed."""
         if now - self._window_start >= self.period:
             self._timestamps.clear()
             self._window_start = now
 
     def update(self, value: float, t: float | None = None) -> bool:
-        """
-        Feed a new sample. Returns True if this sample produced a crossing event.
-
-        Crossing rules (inclusive threshold):
-          - Rising:  last < thr and value >= thr
-          - Falling: last > thr and value <= thr
-        """
         now = time() if t is None else float(t)
         crossed = False
 
@@ -212,7 +191,6 @@ class ContinuousFrequencyMonitor:
 
     @property
     def frequency(self) -> float:
-        """Events per second within the active window."""
         now = time()
         with self._lock:
             if self.sliding_window:
@@ -223,7 +201,6 @@ class ContinuousFrequencyMonitor:
 
     @property
     def count(self) -> int:
-        """Number of events currently in the active window."""
         now = time()
         with self._lock:
             if self.sliding_window:
@@ -233,7 +210,6 @@ class ContinuousFrequencyMonitor:
             return len(self._timestamps)
 
     def reset(self) -> None:
-        """Clear all state and start a fresh window from now."""
         with self._lock:
             self._timestamps.clear()
             self._last_value = None
