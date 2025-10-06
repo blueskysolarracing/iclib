@@ -9,9 +9,11 @@ Key notes (per datasheet snippets provided):
     * LP: 1–800 Hz → ODR nibble 0x8–0xF (HF_ODR=0)
     * HR: 12.5–800 Hz → ODR nibble 0x1–0x7 (HF_ODR=0)
     * HF: 1.6–6.4 kHz → ODR nibble 0x5–0x7 with HF_ODR=1
-- CTRL2 (0x21): SOFT_RESET, BOOT, IF_ADD_INC (set to 1), FDS_SLOPE, I2C_DISABLE, SIM, FUNC_CFG_EN.
+- CTRL2 (0x21): SOFT_RESET, BOOT, IF_ADD_INC (set to 1), FDS_SLOPE,
+    I2C_DISABLE, SIM, FUNC_CFG_EN.
     Do not enable FUNC_CFG_EN for normal operation.
-- FIFO: configure via FIFO_CTRL (0x25) and FIFO_THS (0x2E); read FIFO_SRC (0x2F), FIFO_SAMPLES (0x30).
+- FIFO: configure via FIFO_CTRL (0x25) and FIFO_THS (0x2E);
+    read FIFO_SRC (0x2F), FIFO_SAMPLES (0x30).
     Route FTH to INT1/INT2 via CTRL4/CTRL5.
 - Data registers: burst read 0x28..0x2D with IF_ADD_INC=1 and BDU=1.
 
@@ -23,10 +25,10 @@ from dataclasses import dataclass
 from enum import IntEnum
 from logging import getLogger
 from time import sleep
-from typing import ClassVar, Optional, Tuple
+from typing import Any, ClassVar, Dict, Optional, Tuple
 
 from periphery import I2C, GPIO
-from utilities import twos_complement
+from utilities import twos_complement  # type: ignore[import-not-found]
 
 _logger = getLogger(__name__)
 
@@ -39,29 +41,29 @@ class Register(IntEnum):
     SENSORHUB5_REG = 0x0A
     SENSORHUB6_REG = 0x0B
     """Sensor hub output registers for external sensor data."""
-    
+
     MODULE_8BIT = 0x0C
     """Module output value register."""
-    
+
     WHO_AM_I = 0x0F
     """Device identification register."""
-    
+
     CTRL1 = 0x20
     CTRL2 = 0x21
     CTRL3 = 0x22
     CTRL4 = 0x23
     CTRL5 = 0x24
     """Control registers for device configuration and interrupt settings."""
-    
+
     FIFO_CTRL = 0x25
     """FIFO control register."""
-    
+
     OUT_T = 0x26
     """Temperature sensor output register."""
-    
+
     STATUS = 0x27
     """Status register for data ready and event flags."""
-    
+
     OUT_X_L = 0x28
     OUT_X_H = 0x29
     OUT_Y_L = 0x2A
@@ -69,37 +71,37 @@ class Register(IntEnum):
     OUT_Z_L = 0x2C
     OUT_Z_H = 0x2D
     """Acceleration data output registers (X, Y, Z axes, LSB and MSB)."""
-    
+
     FIFO_THS = 0x2E
     FIFO_SRC = 0x2F
     FIFO_SAMPLES = 0x30
     """FIFO threshold, status, and sample count registers."""
-    
+
     TAP_6D_THS = 0x31
     INT_DUR = 0x32
     WAKE_UP_THS = 0x33
     WAKE_UP_DUR = 0x34
     FREE_FALL = 0x35
     """Threshold and duration configuration registers for motion detection."""
-    
+
     STATUS_DUP = 0x36
     WAKE_UP_SRC = 0x37
     TAP_SRC = 0x38
     SIX_D_SRC = 0x39
     """Event detection status and source registers."""
-    
+
     STEP_COUNTER_MINTHS = 0x3A
     STEP_COUNTER_L = 0x3B
     STEP_COUNTER_H = 0x3C
     """Step counter configuration and output registers."""
-    
+
     FUNC_CK_GATE = 0x3D
     FUNC_SRC = 0x3E
     FUNC_CTRL = 0x3F
     """Embedded function control and status registers."""
 
 
-# ------- Bit masks (only those verified/required are defined precisely) -------
+# Bit masks (only those verified/required are defined precisely)
 
 # CTRL1 (0x20)
 CTRL1_ODR_SHIFT: int = 4
@@ -110,8 +112,9 @@ CTRL1_HF_ODR_MASK: int = 0x02
 CTRL1_BDU_MASK: int = 0x01
 
 # CTRL2 (0x21) — Bit positions vary by ST device family.
-# From existing codebase and typical ST conventions, IF_ADD_INC was set with 0x02.
-# We keep these masks conservative and only use IF_ADD_INC/RESET/BOOT in code.
+# From existing codebase and typical ST conventions, IF_ADD_INC was set
+# with 0x02. We keep these masks conservative and only use
+# IF_ADD_INC/RESET/BOOT in code.
 CTRL2_SOFT_RESET_MASK: int = 0x40
 CTRL2_BOOT_MASK: int = 0x80
 CTRL2_IF_ADD_INC_MASK: int = 0x08
@@ -121,7 +124,8 @@ CTRL2_SIM_MASK: int = 0x01
 CTRL2_FUNC_CFG_EN_MASK: int = 0x20
 
 # STATUS (0x27) — return raw; flags may be checked by user/project.
-# Provide a generic DRDY bit mask as 0x01 (common pattern), but expose raw too.
+# Provide a generic DRDY bit mask as 0x01 (common pattern), but expose
+# raw too.
 STATUS_DRDY_MASK: int = 0x01
 
 # CTRL4 (0x23) — ST[2:1] controls self-test
@@ -129,13 +133,14 @@ CTRL4_ST_POS_MASK:         int = 0x02  # ST1=1, ST2=0 => positive ST
 CTRL4_ST_NEG_MASK:         int = 0x04  # ST2=1, ST1=0 => negative ST
 CTRL4_ST_CLEAR_MASK:       int = 0x06  # both ST bits
 
-# FIFO masks — expose raw fields; write helpers accept raw mode/threshold values.
-# Users should pass correct mode values per datasheet; we don't hardcode mapping.
-FIFO_MODE_MASK: int = 0xFF     # Pass-through write to FIFO_CTRL (mode field)
+# FIFO masks — expose raw fields; write helpers accept raw mode/threshold
+# values. Users should pass correct mode values per datasheet; we don't
+# hardcode mapping.
+FIFO_MODE_MASK: int = 0xFF     # Pass-through write to FIFO_CTRL
 FIFO_THS_MASK: int = 0xFF      # Pass-through threshold value
 
 
-# ------------------------ Exceptions & utilities -----------------------------
+# Exceptions & utilities
 
 class LIS2DS12Error(Exception):
     """Base class for LIS2DS12 errors."""
@@ -181,6 +186,7 @@ class OutputDataRate(IntEnum):
     ODR_1600_HZ = 0x5
     ODR_3200_HZ = 0x6
     ODR_6400_HZ = 0x7
+
 
 class FullScale(IntEnum):
     FS_2G = 0x0
@@ -264,7 +270,8 @@ class LIS2DS12:
         who = self.read(Register.WHO_AM_I, 1)[0]
         if who != self.DEVICE_ID:
             raise DeviceNotFoundError(
-                f"Unexpected WHO_AM_I: 0x{who:02X} (expected 0x{self.DEVICE_ID:02X})"
+                f"Unexpected WHO_AM_I: 0x{who:02X} "
+                f"(expected 0x{self.DEVICE_ID:02X})"
             )
 
         # Ensure I2C auto-increment.
@@ -322,7 +329,9 @@ class LIS2DS12:
         ctrl1 = _set_field(ctrl1, CTRL1_FS_MASK, CTRL1_FS_SHIFT, fs.value)
 
         # HF_ODR for high-frequency rates
-        if odr in (OutputDataRate.ODR_1600_HZ, OutputDataRate.ODR_3200_HZ, OutputDataRate.ODR_6400_HZ):
+        if odr in (OutputDataRate.ODR_1600_HZ,
+                   OutputDataRate.ODR_3200_HZ,
+                   OutputDataRate.ODR_6400_HZ):
             ctrl1 |= CTRL1_HF_ODR_MASK
 
         # BDU on
@@ -335,7 +344,8 @@ class LIS2DS12:
     def enable_highpass(self, enabled: bool) -> None:
         """Enable/disable high-pass slope filter via CTRL2.FDS_SLOPE.
 
-        Note: Bit position requires datasheet confirmation for the target silicon.
+        Note: Bit position requires datasheet confirmation for the target
+        silicon.
         """
         self._set_ctrl2_bits(CTRL2_FDS_SLOPE_MASK, enabled)
 
@@ -358,7 +368,8 @@ class LIS2DS12:
         return self.read(Register.FIFO_SAMPLES, 1)[0]
 
     # ------------------------------- Interrupts ------------------------------
-    # NOTE: Interrupt functionality commented out - INT1/INT2 pins not accessible
+    # NOTE: Interrupt functionality commented out - INT1/INT2 pins not
+    # accessible
 
     # def route_interrupts(
     #     self,
@@ -370,12 +381,13 @@ class LIS2DS12:
     # ) -> None:
     #     """Route events to INT1/INT2 and configure pin behavior.
     #
-    #     NOTE: Exact bit positions in CTRL4/CTRL5 require datasheet validation.
-    #     This method is present for API completeness and should be finalized with
-    #     the actual silicon reference.
+    #     NOTE: Exact bit positions in CTRL4/CTRL5 require datasheet
+    #     validation. This method is present for API completeness and
+    #     should be finalized with the actual silicon reference.
     #     """
     #     _logger.debug(
-    #         "route_interrupts(drdy_to_int1=%s, fth_to_int1=%s, active_low=%s, open_drain=%s, latched=%s)",
+    #         "route_interrupts(drdy_to_int1=%s, fth_to_int1=%s, "
+    #         "active_low=%s, open_drain=%s, latched=%s)",
     #         drdy_to_int1, fth_to_int1, active_low, open_drain, latched,
     #     )
     #     # Placeholder: read-modify-write preserved for future bit routing
@@ -391,7 +403,8 @@ class LIS2DS12:
     #     :return: True if data ready occurred before timeout, else False.
     #     """
     #     if self.int1 is not None:
-    #         # Assume INT1 configured as data-ready; GPIO edge configured externally.
+    #         # Assume INT1 configured as data-ready; GPIO edge configured
+    #         # externally.
     #         return bool(self.int1.poll(timeout_ms / 1000.0))
     #     # Fallback: poll STATUS register
     #     end = timeout_ms / 1000.0
@@ -419,7 +432,7 @@ class LIS2DS12:
     #         t += step
     #     return False
 
-    # ------------------------------- Data path --------------------------------
+    # ------------------------------- Data path -------------------------------
 
     def read_raw(self) -> Tuple[int, int, int]:
         """Burst-read raw 16-bit X/Y/Z (two's complement).
@@ -437,7 +450,10 @@ class LIS2DS12:
         return x, y, z
 
     @staticmethod
-    def convert_to_g(raw: Tuple[int, int, int], fs: FullScale) -> Tuple[float, float, float]:
+    def convert_to_g(
+        raw: Tuple[int, int, int],
+        fs: FullScale
+    ) -> Tuple[float, float, float]:
         """Convert raw counts to g using nominal sensitivity for FS.
 
         Sensitivities (approx, typical for LIS2DS12 HR mode):
@@ -465,26 +481,30 @@ class LIS2DS12:
         return self.Vector(xg, yg, zg)
 
     def read_temperature(self) -> float:
-        """Read temperature (signed 8-bit). Scaling may require calibration.
+        """
+        Read temperature in °C.
 
-        TODO: apply exact scaling/offset per datasheet if required.
+        According to LIS2DS12 datasheet:
+        - OUT_T is 8-bit two's complement.
+        - Sensitivity = 1 °C/LSB.
+        - 0 LSB corresponds to 25 °C.
         """
         t = self.read(Register.OUT_T, 1)[0]
-        if t & 0x80:
+        if t & 0x80:  # sign extension for negative values
             t -= 0x100
-        return float(t)
+        return 25.0 + float(t)  # °C
 
-    # ------------------------------ Status & health ---------------------------
+    # ------------------------------ Status & health --------------------------
 
     def status(self) -> int:
         """Return raw STATUS register value."""
         return self.read(Register.STATUS, 1)[0]
 
-    def fifo_status(self) -> dict:
+    def fifo_status(self) -> Dict[str, int]:
         """Return FIFO status information.
 
-        Returns a dict with raw fields so higher-level logic can decide based on
-        the actual silicon bit definitions and usage.
+        Returns a dict with raw fields so higher-level logic can decide
+        based on the actual silicon bit definitions and usage.
         """
         return {
             "FIFO_SRC": self.read_fifo_src(),
@@ -492,11 +512,74 @@ class LIS2DS12:
         }
 
     def self_test(self) -> None:
-        """Perform self-test sequence.
+        """Perform self-test sequence per datasheet.
 
-        TODO: Implement per datasheet self-test enable bits and thresholds for
-        delta comparison. The skeleton exists for API completeness.
+        Validates sensor functionality by comparing baseline readings with
+        readings taken during self-test mode. Delta must be within
+        70-1500 mg.
         """
-        _logger.warning("self_test() not implemented; add thresholds per datasheet")
-        # Placeholder: No operation
-        return
+        # save current config
+        c1 = self.read(Register.CTRL1, 1)[0]
+        c2 = self.read(Register.CTRL2, 1)[0]
+        c4 = self.read(Register.CTRL4, 1)[0]
+
+        try:
+            # ensure IF_ADD_INC=1 (it defaults to 1 but set explicitly)
+            self.write(
+                Register.CTRL2,
+                (c2 | CTRL2_IF_ADD_INC_MASK) & ~CTRL2_FUNC_CFG_EN_MASK
+            )
+
+            # HR 100 Hz, FS=±2g, BDU=1; ODR nibble=0b0100, FS=00, HF_ODR=0
+            ctrl1 = (0b0100 << 4) | (0b00 << 2) | 0 | 1
+            self.write(Register.CTRL1, ctrl1)
+
+            # discard 1 sample for HR>=100Hz
+            _ = self.read_raw()
+
+            # collect baseline average (32 samples)
+            fs = FullScale.FS_2G
+            sx = sy = sz = 0.0
+            for _ in range(32):
+                raw = self.read_raw()
+                x_g, y_g, z_g = self.convert_to_g(raw, fs)
+                # convert to mg for comparison
+                sx += x_g * 1000.0
+                sy += y_g * 1000.0
+                sz += z_g * 1000.0
+            base = (sx / 32.0, sy / 32.0, sz / 32.0)
+
+            # enable ST(+): ST1=1, ST2=0
+            self.write(
+                Register.CTRL4,
+                (c4 & ~CTRL4_ST_CLEAR_MASK) | CTRL4_ST_POS_MASK
+            )
+
+            # settle; then discard 1 sample again
+            sleep(0.08)
+            _ = self.read_raw()
+
+            # collect stimulated average (32 samples)
+            sx = sy = sz = 0.0
+            for _ in range(32):
+                raw = self.read_raw()
+                x_g, y_g, z_g = self.convert_to_g(raw, fs)
+                # convert to mg for comparison
+                sx += x_g * 1000.0
+                sy += y_g * 1000.0
+                sz += z_g * 1000.0
+            stim = (sx / 32.0, sy / 32.0, sz / 32.0)
+
+            # compute deltas and check window
+            deltas = [abs(stim[i] - base[i]) for i in range(3)]
+            for d in deltas:
+                if not (70.0 <= d <= 1500.0):
+                    raise ValueError(
+                        f"Self-test out of spec: delta {d:.1f} mg"
+                    )
+
+        finally:
+            # clear ST and restore config
+            self.write(Register.CTRL4, c4 & ~CTRL4_ST_CLEAR_MASK)
+            self.write(Register.CTRL1, c1)
+            self.write(Register.CTRL2, c2)
