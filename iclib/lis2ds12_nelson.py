@@ -26,6 +26,7 @@ from time import sleep
 from typing import ClassVar, Optional, Tuple
 
 from periphery import I2C, GPIO
+from utilities import twos_complement
 
 _logger = getLogger(__name__)
 
@@ -111,17 +112,22 @@ CTRL1_BDU_MASK: int = 0x01
 # CTRL2 (0x21) — Bit positions vary by ST device family.
 # From existing codebase and typical ST conventions, IF_ADD_INC was set with 0x02.
 # We keep these masks conservative and only use IF_ADD_INC/RESET/BOOT in code.
-CTRL2_SOFT_RESET_MASK: int = 0x40  # TODO: verify against datasheet
-CTRL2_BOOT_MASK: int = 0x80        # TODO: verify against datasheet
-CTRL2_IF_ADD_INC_MASK: int = 0x02  # Auto-increment enabled
-CTRL2_FDS_SLOPE_MASK: int = 0x10   # TODO: verify against datasheet
-CTRL2_I2C_DISABLE_MASK: int = 0x04 # TODO: verify against datasheet
-CTRL2_SIM_MASK: int = 0x01         # TODO: verify against datasheet
-CTRL2_FUNC_CFG_EN_MASK: int = 0x20 # Advanced bank; do not enable in normal op
+CTRL2_SOFT_RESET_MASK: int = 0x40
+CTRL2_BOOT_MASK: int = 0x80
+CTRL2_IF_ADD_INC_MASK: int = 0x08
+CTRL2_FDS_SLOPE_MASK: int = 0x10
+CTRL2_I2C_DISABLE_MASK: int = 0x04
+CTRL2_SIM_MASK: int = 0x01
+CTRL2_FUNC_CFG_EN_MASK: int = 0x20
 
 # STATUS (0x27) — return raw; flags may be checked by user/project.
 # Provide a generic DRDY bit mask as 0x01 (common pattern), but expose raw too.
-STATUS_DRDY_MASK: int = 0x01  # TODO: verify against datasheet
+STATUS_DRDY_MASK: int = 0x01
+
+# CTRL4 (0x23) — ST[2:1] controls self-test
+CTRL4_ST_POS_MASK:         int = 0x02  # ST1=1, ST2=0 => positive ST
+CTRL4_ST_NEG_MASK:         int = 0x04  # ST2=1, ST1=0 => negative ST
+CTRL4_ST_CLEAR_MASK:       int = 0x06  # both ST bits
 
 # FIFO masks — expose raw fields; write helpers accept raw mode/threshold values.
 # Users should pass correct mode values per datasheet; we don't hardcode mapping.
@@ -352,65 +358,66 @@ class LIS2DS12:
         return self.read(Register.FIFO_SAMPLES, 1)[0]
 
     # ------------------------------- Interrupts ------------------------------
+    # NOTE: Interrupt functionality commented out - INT1/INT2 pins not accessible
 
-    def route_interrupts(
-        self,
-        drdy_to_int1: bool = True,
-        fth_to_int1: bool = False,
-        active_low: bool = False,
-        open_drain: bool = False,
-        latched: bool = False,
-    ) -> None:
-        """Route events to INT1/INT2 and configure pin behavior.
+    # def route_interrupts(
+    #     self,
+    #     drdy_to_int1: bool = True,
+    #     fth_to_int1: bool = False,
+    #     active_low: bool = False,
+    #     open_drain: bool = False,
+    #     latched: bool = False,
+    # ) -> None:
+    #     """Route events to INT1/INT2 and configure pin behavior.
+    #
+    #     NOTE: Exact bit positions in CTRL4/CTRL5 require datasheet validation.
+    #     This method is present for API completeness and should be finalized with
+    #     the actual silicon reference.
+    #     """
+    #     _logger.debug(
+    #         "route_interrupts(drdy_to_int1=%s, fth_to_int1=%s, active_low=%s, open_drain=%s, latched=%s)",
+    #         drdy_to_int1, fth_to_int1, active_low, open_drain, latched,
+    #     )
+    #     # Placeholder: read-modify-write preserved for future bit routing
+    #     ctrl4 = self.read(Register.CTRL4, 1)[0]
+    #     ctrl5 = self.read(Register.CTRL5, 1)[0]
+    #     # TODO: apply bitfields per datasheet
+    #     self.write(Register.CTRL4, ctrl4)
+    #     self.write(Register.CTRL5, ctrl5)
 
-        NOTE: Exact bit positions in CTRL4/CTRL5 require datasheet validation.
-        This method is present for API completeness and should be finalized with
-        the actual silicon reference.
-        """
-        _logger.debug(
-            "route_interrupts(drdy_to_int1=%s, fth_to_int1=%s, active_low=%s, open_drain=%s, latched=%s)",
-            drdy_to_int1, fth_to_int1, active_low, open_drain, latched,
-        )
-        # Placeholder: read-modify-write preserved for future bit routing
-        ctrl4 = self.read(Register.CTRL4, 1)[0]
-        ctrl5 = self.read(Register.CTRL5, 1)[0]
-        # TODO: apply bitfields per datasheet
-        self.write(Register.CTRL4, ctrl4)
-        self.write(Register.CTRL5, ctrl5)
+    # def wait_for_drdy(self, timeout_ms: int = 10) -> bool:
+    #     """Wait for DRDY via INT1 GPIO if provided, else poll STATUS.
+    #
+    #     :return: True if data ready occurred before timeout, else False.
+    #     """
+    #     if self.int1 is not None:
+    #         # Assume INT1 configured as data-ready; GPIO edge configured externally.
+    #         return bool(self.int1.poll(timeout_ms / 1000.0))
+    #     # Fallback: poll STATUS register
+    #     end = timeout_ms / 1000.0
+    #     t = 0.0
+    #     step = 0.001
+    #     while t < end:
+    #         if self.status() & STATUS_DRDY_MASK:
+    #             return True
+    #         sleep(step)
+    #         t += step
+    #     return False
 
-    def wait_for_drdy(self, timeout_ms: int = 10) -> bool:
-        """Wait for DRDY via INT1 GPIO if provided, else poll STATUS.
-
-        :return: True if data ready occurred before timeout, else False.
-        """
-        if self.int1 is not None:
-            # Assume INT1 configured as data-ready; GPIO edge configured externally.
-            return bool(self.int1.poll(timeout_ms / 1000.0))
-        # Fallback: poll STATUS register
-        end = timeout_ms / 1000.0
-        t = 0.0
-        step = 0.001
-        while t < end:
-            if self.status() & STATUS_DRDY_MASK:
-                return True
-            sleep(step)
-            t += step
-        return False
-
-    def wait_for_fifo_fth(self, timeout_ms: int = 10) -> bool:
-        if self.int1 is not None:
-            return bool(self.int1.poll(timeout_ms / 1000.0))
-        end = timeout_ms / 1000.0
-        t = 0.0
-        step = 0.001
-        while t < end:
-            src = self.read_fifo_src()
-            # TODO: check FTH flag bit in FIFO_SRC
-            if src:  # any non-zero as placeholder
-                return True
-            sleep(step)
-            t += step
-        return False
+    # def wait_for_fifo_fth(self, timeout_ms: int = 10) -> bool:
+    #     if self.int1 is not None:
+    #         return bool(self.int1.poll(timeout_ms / 1000.0))
+    #     end = timeout_ms / 1000.0
+    #     t = 0.0
+    #     step = 0.001
+    #     while t < end:
+    #         src = self.read_fifo_src()
+    #         # TODO: check FTH flag bit in FIFO_SRC
+    #         if src:  # any non-zero as placeholder
+    #             return True
+    #         sleep(step)
+    #         t += step
+    #     return False
 
     # ------------------------------- Data path --------------------------------
 
@@ -424,9 +431,9 @@ class LIS2DS12:
         y = (data[3] << 8) | data[2]
         z = (data[5] << 8) | data[4]
         # two's complement for 16-bit
-        x = x - (1 << 16) if x & (1 << 15) else x
-        y = y - (1 << 16) if y & (1 << 15) else y
-        z = z - (1 << 16) if z & (1 << 15) else z
+        x = twos_complement(x, 16)
+        y = twos_complement(y, 16)
+        z = twos_complement(z, 16)
         return x, y, z
 
     @staticmethod
