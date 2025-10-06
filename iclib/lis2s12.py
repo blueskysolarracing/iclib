@@ -1,11 +1,10 @@
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import IntEnum
-from logging import getLogger
 from time import sleep
 from typing import ClassVar
 
-from periphery import I2C, GPIO
+from periphery import I2C
 
 
 class Register(IntEnum):
@@ -16,29 +15,29 @@ class Register(IntEnum):
     SENSORHUB5_REG = 0x0A
     SENSORHUB6_REG = 0x0B
     """Sensor hub output registers for external sensor data."""
-    
+
     MODULE_8BIT = 0x0C
     """Module output value register."""
-    
+
     WHO_AM_I = 0x0F
     """Device identification register."""
-    
+
     CTRL1 = 0x20
     CTRL2 = 0x21
     CTRL3 = 0x22
     CTRL4 = 0x23
     CTRL5 = 0x24
     """Control registers for device configuration and interrupt settings."""
-    
+
     FIFO_CTRL = 0x25
     """FIFO control register."""
-    
+
     OUT_T = 0x26
     """Temperature sensor output register."""
-    
+
     STATUS = 0x27
     """Status register for data ready and event flags."""
-    
+
     OUT_X_L = 0x28
     OUT_X_H = 0x29
     OUT_Y_L = 0x2A
@@ -46,30 +45,30 @@ class Register(IntEnum):
     OUT_Z_L = 0x2C
     OUT_Z_H = 0x2D
     """Acceleration data output registers (X, Y, Z axes, LSB and MSB)."""
-    
+
     FIFO_THS = 0x2E
     FIFO_SRC = 0x2F
     FIFO_SAMPLES = 0x30
     """FIFO threshold, status, and sample count registers."""
-    
+
     TAP_6D_THS = 0x31
     INT_DUR = 0x32
     WAKE_UP_THS = 0x33
     WAKE_UP_DUR = 0x34
     FREE_FALL = 0x35
     """Threshold and duration configuration registers for motion detection."""
-    
+
     STATUS_DUP = 0x36
     WAKE_UP_SRC = 0x37
     TAP_SRC = 0x38
     SIX_D_SRC = 0x39
     """Event detection status and source registers."""
-    
+
     STEP_COUNTER_MINTHS = 0x3A
     STEP_COUNTER_L = 0x3B
     STEP_COUNTER_H = 0x3C
     """Step counter configuration and output registers."""
-    
+
     FUNC_CK_GATE = 0x3D
     FUNC_SRC = 0x3E
     FUNC_CTRL = 0x3F
@@ -97,6 +96,7 @@ class OutputDataRate(IntEnum):
     ODR_3200_HZ = 0x6
     ODR_6400_HZ = 0x7
 
+
 class FullScale(IntEnum):
     FS_2G = 0x0
     FS_16G = 0x1
@@ -106,11 +106,11 @@ class FullScale(IntEnum):
 
 @dataclass
 class LIS2DS12:
-    ADDRESS: ClassVar[int] = 0x1E 
+    ADDRESS: ClassVar[int] = 0x1E
     DEVICE_ID: ClassVar[int] = 0x43
-    
+
     i2c: I2C
-    
+
     @dataclass
     class Vector:
         x: float
@@ -118,11 +118,8 @@ class LIS2DS12:
         z: float
 
     def __post_init__(self) -> None:
-
-
         if self.DEVICE_ID != self.read(Register.WHO_AM_I, 1)[0]:
             raise ValueError('Incorrect Device ID')
-
 
     def write(self, register: Register, data: int) -> None:
         message = I2C.Message([register, data])
@@ -136,59 +133,56 @@ class LIS2DS12:
         self.i2c.transfer(self.ADDRESS, [write_message, read_message])
 
         return list(read_message.data)
-        
+
     def configure(self, odr: OutputDataRate = OutputDataRate.ODR_100_HZ,
-              full_scale: FullScale = FullScale.FS_2G,
-              high_resolution: bool = True) -> None:
+                  full_scale: FullScale = FullScale.FS_2G,
+                  high_resolution: bool = True) -> None:
 
         ctrl1_value = 0x00
 
-       
-        if odr in [OutputDataRate.ODR_12_5_HZ_HR, OutputDataRate.ODR_25_HZ_HR,
-                   OutputDataRate.ODR_50_HZ_HR, OutputDataRate.ODR_100_HZ_HR,
-                   OutputDataRate.ODR_200_HZ_HR, OutputDataRate.ODR_400_HZ_HR,
+        if odr in [OutputDataRate.ODR_12_5_HZ_HR,
+                   OutputDataRate.ODR_25_HZ_HR,
+                   OutputDataRate.ODR_50_HZ_HR,
+                   OutputDataRate.ODR_100_HZ_HR,
+                   OutputDataRate.ODR_200_HZ_HR,
+                   OutputDataRate.ODR_400_HZ_HR,
                    OutputDataRate.ODR_800_HZ_HR]:
-            
+
             ctrl1_value |= (odr.value << 4)
-            high_resolution = True  
+            high_resolution = True
         elif odr in [OutputDataRate.ODR_1600_HZ, OutputDataRate.ODR_3200_HZ,
                      OutputDataRate.ODR_6400_HZ]:
-           
+
             ctrl1_value |= (odr.value << 4)
-            ctrl1_value |= 0x02  
-            high_resolution = False  
+            ctrl1_value |= 0x02
+            high_resolution = False
         else:
-           
+
             ctrl1_value |= (odr.value << 4)
 
         ctrl1_value |= (full_scale.value << 2)
 
-      
         ctrl1_value |= 0x01  # Set BDU bit
 
         self.write(Register.CTRL1, ctrl1_value)
 
-
         ctrl2_value = 0x00
-        ctrl2_value |= 0x02  
+        ctrl2_value |= 0x02
 
-      
         if high_resolution:
-            ctrl2_value |= 0x08  
+            ctrl2_value |= 0x08
 
         self.write(Register.CTRL2, ctrl2_value)
 
-       
         ctrl4_value = 0x00
 
         if high_resolution:
-          
-            ctrl4_value |= 0x00  
+
+            ctrl4_value |= 0x00
         else:
-           
-            ctrl4_value |= 0x40  
+
+            ctrl4_value |= 0x40
 
         self.write(Register.CTRL4, ctrl4_value)
 
-      
         sleep(0.01)

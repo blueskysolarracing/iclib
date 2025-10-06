@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from logging import getLogger
 from time import sleep
-from typing import Any, ClassVar, Dict, Optional, Tuple
+from typing import ClassVar, Dict, Optional, Tuple
 
 from periphery import I2C, GPIO
 from utilities import twos_complement  # type: ignore[import-not-found]
