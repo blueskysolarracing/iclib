@@ -216,24 +216,27 @@ class ContinuousFrequencyMonitor:
                 crossed = rising or falling
 
             if self.window is not None:
-                while ((current_time - timestamps[0]) > self.window):
+                while (
+                    len(timestamps) > 0
+                    and (current_time - timestamps[0]) > self.window
+                ):
                     timestamps.popleft()
 
             if crossed:
-                timestamps.append((current_time - previous_time) / 2)
+                timestamps.append((current_time + previous_time) / 2)
 
-                if len(timestamps) > 1:
-                    time_difference = timestamps[-1] - timestamps[0]
-                    if self.edge == self.Edge.BOTH:
-                        self.frequency = (
-                            (len(timestamps) - 1) / 2 / time_difference
-                        )
-                    else:
-                        self.frequency = (
-                            (len(timestamps) - 1) / time_difference
-                        )
+            if len(timestamps) > 1:
+                time_difference = timestamps[-1] - timestamps[0]
+                if self.edge == self.Edge.BOTH:
+                    self.frequency = (
+                        (len(timestamps) - 1) / 2 / time_difference
+                    )
                 else:
-                    self.frequency = 0.0
+                    self.frequency = (
+                        (len(timestamps) - 1) / time_difference
+                    )
+            else:
+                self.frequency = 0.0
 
             previous_value = current_value
             previous_time = current_time
