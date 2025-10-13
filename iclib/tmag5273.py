@@ -108,13 +108,20 @@ class MagneticChannel(Enum):
         self.size = size
 
 
+class AngleEnable(IntEnum):
+    DISABLE = 0x00
+    XY = 0x01
+    YZ = 0x02
+    XZ = 0x03
+
+
 class MagneticRange(IntEnum):
     DEFAULT = 0x00
     EXTENDED = 0x01
 
 
 @dataclass
-class TMAH5273:
+class TMAG5273:
     """A Python driver for Texas Instruments TMAG5273 Hall-Effect sensor"""
 
     i2c: I2C
@@ -145,6 +152,7 @@ class TMAH5273:
         init=False,
         default=MagneticChannel.DISABLE
     )
+    _angle_enable: AngleEnable = field(init=False, default=AngleEnable.DISABLE)
     _magnetic_range: MagneticRange = field(
         init=False,
         default=MagneticRange.DEFAULT
@@ -180,24 +188,50 @@ class TMAH5273:
     def close(self) -> None:
         self.i2c.close()
 
-    def check_crc_error(self, data: list[int], cyc_byte: int) -> int:
-        crc = 0xFF
-        msb = bit_getter(7)
+    def check_crc_error(self, data: list[int], cyc_byte: int) -> bool:
+        """
+        Validate data with CRC byte
 
-        for b in data:
-            crc ^= (b & 0xFF)
-            for _ in range(8):
-                if msb(crc):
-                    crc = ((crc << 1) & 0xFF) ^ 0x07
-                else:
-                    crc = (crc << 1) & 0xFF
+        return True if matching
+        return False if not matching (error)
+        """
+        c = 0xFF
+        crc = [0] * 8
 
-        return 0 if crc == (cyc_byte & 0xFF) else 1
+        b0 = bit_getter(0)
+        b1 = bit_getter(1)
+        b2 = bit_getter(2)
+        b3 = bit_getter(3)
+        b4 = bit_getter(4)
+        b5 = bit_getter(5)
+        b6 = bit_getter(6)
+        b7 = bit_getter(7)
+
+        for x in range(len(data)):
+            d = data[x]
+            crc[0] = b7(d) ^ b6(d) ^ b0(d) ^ b0(c) ^ b6(c) ^ b7(c)
+            crc[1] = b6(d) ^ b1(d) ^ b0(d) ^ b0(c) ^ b1(c) ^ b6(c)
+            crc[2] = (
+                b6(d) ^ b2(d) ^ b1(d) ^ b0(d) ^ b0(c) ^ b1(c) ^ b2(c) ^ b6(c)
+            )
+            crc[3] = (
+                b7(d) ^ b3(d) ^ b2(d) ^ b1(d) ^ b1(c) ^ b2(c) ^ b3(c) ^ b7(c)
+            )
+            crc[4] = b4(d) ^ b3(d) ^ b2(d) ^ b2(c) ^ b3(c) ^ b4(c)
+            crc[5] = b5(d) ^ b4(d) ^ b3(d) ^ b3(c) ^ b4(c) ^ b5(c)
+            crc[6] = b6(d) ^ b5(d) ^ b4(d) ^ b4(c) ^ b5(c) ^ b6(c)
+            crc[7] = b7(d) ^ b6(d) ^ b5(d) ^ b5(c) ^ b6(c) ^ b7(c)
+
+            c = 0x00
+            for i in range(8):
+                c |= (crc[i] & 0x1) << i
+
+        return c == cyc_byte
 
     @property
-    def channels(self) -> list[float]:
+    def channels(self) -> tuple[list[float], bool | None]:
         if self.i2c_read_mode == I2CReadMode.STANDARD_3BYTE:
-            return list()
+            return ([], None)
 
         length = self.magnetic_channel.size
         if self.temperature_enable == Enable.ENABLE:
@@ -213,6 +247,7 @@ class TMAH5273:
 
         received = list(read_message.data)
         result = []
+        crc = None
 
         if self.i2c_read_mode == I2CReadMode.SHORT_16BIT_DATA:
             data_size = 2
@@ -230,20 +265,18 @@ class TMAH5273:
             ))
 
         if self.crc_enable == Enable.ENABLE:
-            result.append(self.check_crc_error(received[0:-1], received[-1]))
+            crc = self.check_crc_error(received[0:-1], received[-1])
 
-        return result
+        return (result, crc)
 
     def parse_magnetic_field(self, bytes: list[int]) -> float:
-        if self.i2c_read_mode == I2CReadMode.STANDARD_3BYTE:
-            return float()
-
-        if self.i2c_read_mode == I2CReadMode.SHORT_16BIT_DATA:
-            raw_value = twos_complement(bytes[0] << 8 & bytes[1], 16)
-            return raw_value / (2 ** 16) * 2 * self.magnetic_range_bound
-        else:
-            raw_value = twos_complement(bytes[0], 8)
-            return raw_value / (2 ** 8) * 2 * self.magnetic_range_bound
+        if len(bytes) == 2:
+            raw = twos_complement((bytes[0] << 8 | bytes[1]) & 0xFFFF, 16)
+            return raw / (2 ** 16) * 2 * self.magnetic_range_bound
+        if len(bytes) == 1:
+            raw = twos_complement(bytes[0] & 0xFF, 8)
+            return raw / (2 ** 8) * 2 * self.magnetic_range_bound
+        return float()
 
     def parse_temperature(self, data: list[int]) -> float:
         TSENS_T0 = 25.0
@@ -255,7 +288,7 @@ class TMAH5273:
             return TSENS_T0 + (code - TADC_T0) / TADC_RES
         if len(data) == 1:
             code8 = twos_complement(data[0] & 0xFF, 8)
-            return TSENS_T0 + ((256 * code8) - TADC_T0) / (256 * TADC_RES)
+            return TSENS_T0 + (256 * (code8 - TADC_T0 / 256)) / TADC_RES
 
         return float()
 
@@ -271,7 +304,7 @@ class TMAH5273:
     @property
     def magnitude(self) -> float:
         code = self.read(Register.MAGNITUDE_RESULT, 1)[0] & 0xFF
-        return (code / (2**7)) * self.magnetic_range_bound
+        return code / 0xFF
 
     @property
     def crc_enable(self) -> Enable:
@@ -335,9 +368,9 @@ class TMAH5273:
         """Set parameters in DEVICE_CONFIG_1 register."""
 
         self._crc_enable = crc_enable
-        self._angular_velocity_unit = magnet_temperature_coeff
-        self._angle_unit = conversion_avg
-        self._temperature_unit = i2c_read_mode
+        self._magnet_temperature_coeff = magnet_temperature_coeff
+        self._conversion_avg = conversion_avg
+        self._i2c_read_mode = i2c_read_mode
         raw_byte = (
             crc_enable << 7
             | magnet_temperature_coeff << 5
@@ -353,6 +386,7 @@ class TMAH5273:
 
     @operating_mode.setter
     def operating_mode(self, value: OperatingMode) -> None:
+        self._operating_mode = value
         original_byte = self.read(Register.DEVICE_CONFIG_2, 1)[0] & 0xFC
         send_byte = original_byte | value
         self.write(Register.DEVICE_CONFIG_2, send_byte)
@@ -363,9 +397,21 @@ class TMAH5273:
 
     @magnetic_channel.setter
     def magnetic_channel(self, value: MagneticChannel) -> None:
+        self._magnetic_channel = value
         original_byte = self.read(Register.SENSOR_CONFIG_1, 1)[0] & 0x0F
         send_byte = original_byte | value.code << 4
         self.write(Register.SENSOR_CONFIG_1, send_byte)
+
+    @property
+    def angle_enable(self) -> AngleEnable:
+        return self._angle_enable
+
+    @angle_enable.setter
+    def angle_enable(self, value: AngleEnable) -> None:
+        self._angle_enable = value
+        original_byte = self.read(Register.SENSOR_CONFIG_2, 1)[0] & 0xF3
+        send_byte = original_byte | value << 2
+        self.write(Register.SENSOR_CONFIG_2, send_byte)
 
     @property
     def magnetic_range(self) -> MagneticRange:
@@ -377,6 +423,7 @@ class TMAH5273:
             self.magnetic_range_bound = self.variant.bound
         else:
             self.magnetic_range_bound = self.variant.bound * 2
+        self._magnetic_range = value
         original_byte = self.read(Register.SENSOR_CONFIG_2, 1)[0] & 0xFC
         send_byte = original_byte | value << 1 | value
         self.write(Register.SENSOR_CONFIG_2, send_byte)
@@ -387,6 +434,7 @@ class TMAH5273:
 
     @temperature_enable.setter
     def temperature_enable(self, value: Enable) -> None:
+        self._temperature_enable = value
         original_byte = self.read(Register.T_CONFIG, 1)[0] & 0xFE
         send_byte = original_byte | value
         self.write(Register.T_CONFIG, send_byte)

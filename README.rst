@@ -2,7 +2,7 @@
 ICLib
 =====
 
-ADC78H89 is a A collection of integrated circuit libraries in pure Python.
+A collection of integrated circuit libraries in pure Python.
 
 Features
 --------
