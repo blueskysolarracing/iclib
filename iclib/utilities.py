@@ -137,6 +137,7 @@ class FrequencyMonitor:
                             / time_difference
                         )
 
+
 @dataclass
 class ContinuousFrequencyMonitor:
 
@@ -175,8 +176,14 @@ class ContinuousFrequencyMonitor:
                 rising = self._last_value < self.threshold <= value
                 falling = self._last_value > self.threshold >= value
 
-                if (self.edge in (self.Edge.RISING, self.Edge.BOTH) and rising) or \
-                   (self.edge in (self.Edge.FALLING, self.Edge.BOTH) and falling):
+                rise_ok = self.edge in (
+                    self.Edge.RISING, self.Edge.BOTH
+                )
+                fall_ok = self.edge in (
+                    self.Edge.FALLING, self.Edge.BOTH
+                )
+
+                if (rise_ok and rising) or (fall_ok and falling):
                     self._timestamps.append(now)
                     crossed = True
 
@@ -188,16 +195,6 @@ class ContinuousFrequencyMonitor:
             self._last_value = value
 
         return crossed
-
-    @property
-    def frequency(self) -> float:
-        now = time()
-        with self._lock:
-            if self.sliding_window:
-                self._prune(now)
-            else:
-                self._rotate_fixed(now)
-            return len(self._timestamps) / self.period
 
     @property
     def count(self) -> int:
@@ -215,15 +212,15 @@ class ContinuousFrequencyMonitor:
             self._last_value = None
             self._window_start = time()
 
-
     @property
     def frequency(self) -> float:
-        """Get the frequency.
-
-        :return: The frequency (in hertz).
-        """
+        now = time()
         with self._lock:
-            return self._frequency
+            if self.sliding_window:
+                self._prune(now)
+            else:
+                self._rotate_fixed(now)
+            return len(self._timestamps) / self.period
 
     @frequency.setter
     def frequency(self, value: float) -> None:
@@ -233,15 +230,18 @@ class ContinuousFrequencyMonitor:
         :return: ``None``.
         """
         with self._lock:
-            self._frequency = value
+            self._frequency = float(value)
 
     def stop(self) -> None:
         """Stop the frequency monitor.
 
         :return: ``None``.
         """
-        self._stoppage.set()
-        self._thread.join()
+        with self._lock:
+            self._timestamps.clear()
+            self._last_value = None
+            self._window_start = time()
+            self._frequency = 0.0
 
 
 @dataclass
