@@ -6,8 +6,9 @@ from dataclasses import dataclass, field
 from threading import Event, Lock, Thread
 from time import time
 from typing import Any, ClassVar
+from enum import IntEnum
 
-from periphery import GPIO, SPI
+from periphery import GPIO, I2C, SPI
 
 
 def bit_getter(index: int) -> Callable[[int], bool]:
@@ -98,7 +99,7 @@ class FrequencyMonitor:
     """
 
     GPIO_EDGE: ClassVar[str] = 'both'
-    """The GPIO inverted status."""
+    """The GPIO edge status."""
     gpio: GPIO
     """The GPIO to be monitored."""
     sample_count: int = field(default=5)
@@ -154,6 +155,126 @@ class FrequencyMonitor:
         """
         with self._lock:
             self._frequency = value
+
+    def stop(self) -> None:
+        """Stop the frequency monitor.
+
+        :return: ``None``.
+        """
+        self._stoppage.set()
+        self._thread.join()
+
+
+@dataclass
+class ContinuousFrequencyMonitor:
+    """Calculate the frequency of an arbitrary analog signal.
+
+    Return the frequency and current reading.
+    """
+
+    class Edge(IntEnum):
+        RISING = 0x01
+        FALLING = 0x02
+        BOTH = 0x03
+
+    threshold: float
+    value_getter: Callable[[], float]
+    window: float | None = field(default=1)
+    edge: Edge = field(default=Edge.BOTH)
+    sample_count: int = field(default=5)
+
+    _lock1: Lock = field(init=False, default_factory=Lock)
+    _lock2: Lock = field(init=False, default_factory=Lock)
+    _frequency: float = field(init=False, default=0)
+    _reading: float = field(init=False, default=0)
+    _stoppage: Event = field(init=False, default_factory=Event)
+    _thread: Thread = field(init=False)
+
+    def __post_init__(self) -> None:
+        self._thread = Thread(target=self._monitor, daemon=True)
+
+        self._thread.start()
+
+    def _monitor(self) -> None:
+        timestamps = deque[float](maxlen=self.sample_count)
+        previous_value = 0.0
+        previous_time = time()
+
+        while not self._stoppage.is_set():
+            current_value = self.value_getter()
+            current_time = time()
+            rising = previous_value < self.threshold < current_value
+            falling = previous_value > self.threshold > current_value
+
+            self.reading = current_value
+
+            if self.edge == self.Edge.RISING:
+                crossed = rising
+            elif self.edge == self.Edge.FALLING:
+                crossed = falling
+            else:
+                crossed = rising or falling
+
+            if self.window is not None:
+                while ((current_time - timestamps[0]) > self.window):
+                    timestamps.popleft()
+
+            if crossed:
+                timestamps.append((current_time - previous_time) / 2)
+
+                if len(timestamps) > 1:
+                    time_difference = timestamps[-1] - timestamps[0]
+                    if self.edge == self.Edge.BOTH:
+                        self.frequency = (
+                            (len(timestamps) - 1) / 2 / time_difference
+                        )
+                    else:
+                        self.frequency = (
+                            (len(timestamps) - 1) / time_difference
+                        )
+                else:
+                    self.frequency = 0.0
+
+            previous_value = current_value
+            previous_time = current_time
+
+    @property
+    def frequency(self) -> float:
+        """Get the frequency.
+
+        :return: The frequency (in hertz).
+        """
+        with self._lock1:
+            return self._frequency
+
+    @frequency.setter
+    def frequency(self, value: float) -> None:
+        """Set the frequency.
+
+        :param value: The new frequency value.
+        :return: ``None``.
+        """
+        with self._lock1:
+            self._frequency = value
+
+    @property
+    def reading(self) -> float:
+        """Get the reading.
+
+        :return: The reading.
+        """
+        with self._lock2:
+            return self._reading
+
+    @reading.setter
+    def reading(self, value: float) -> None:
+        """Set the reading.
+
+        :param value: The new reading value.
+        :return: ``None``.
+        """
+        with self._lock2:
+            self._reading = value
 
     def stop(self) -> None:
         """Stop the frequency monitor.
@@ -227,6 +348,28 @@ class LockedSPI:
             received_data = self.spi.transfer(data)
 
         return received_data
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.spi, name)
+
+
+@dataclass
+class LockedI2C:
+    """I2C interface with mutually exclusive access."""
+
+    i2c: I2C
+    """The I2C interface."""
+    _lock: Lock = field(default_factory=Lock)
+
+    def transfer(self, address: int, messages: list[I2C.Message]) -> None:
+        """Transmit and receive data from I2C with mutually exclusive
+        access.
+
+        :param messages: List of I2C.Message messages.
+        :return: None.
+        """
+        with self._lock:
+            self.i2c.transfer(address, messages)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.spi, name)
