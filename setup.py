@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='iclib',
-    version='0.0.0.dev20',
+    version='0.0.0.dev21',
     description='A collection of integrated circuit libraries in pure Python',
     long_description=open('README.rst').read(),
     long_description_content_type='text/x-rst',
@@ -30,6 +30,7 @@ setup(
         'a1230',
         'adc78h89',
         'ina229',
+        'lis2ds12',
         'ltc6810',
         'mcp23s17',
         'mcp4161',
@@ -43,6 +44,7 @@ setup(
         'sn74hcs137',
         'texas instruments',
         'ti',
+        'tmag5273',
     ],
     project_urls={
         'Documentation': 'https://iclib.readthedocs.io/en/latest/',
