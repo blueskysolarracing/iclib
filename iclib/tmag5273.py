@@ -169,8 +169,11 @@ class TMAG5273:
         self.i2c.transfer(self.address, [message])
 
     def read(self, register: Register, length: int) -> list[int]:
-        if self.i2c_read_mode != I2CReadMode.STANDARD_3BYTE:
+        previous_i2c_read_mode = self.i2c_read_mode
+        revert_i2c_read_mode = False
+        if previous_i2c_read_mode != I2CReadMode.STANDARD_3BYTE:
             self.i2c_read_mode = I2CReadMode.STANDARD_3BYTE
+            revert_i2c_read_mode = True
 
         if self.crc_enable == Enable.ENABLE:
             length = 5
@@ -182,6 +185,9 @@ class TMAG5273:
             received = list(read_message.data)
             received[4] = self.check_crc_error(received[0:4], received[4])
             return received
+
+        if revert_i2c_read_mode:
+            self.i2c_read_mode = previous_i2c_read_mode
 
         return list(read_message.data)
 
