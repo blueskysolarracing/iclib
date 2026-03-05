@@ -206,16 +206,16 @@ class LIS2HH12:
 
     def self_test(self) -> bool:
         self.write_bits(Register.CTRL5, {3: 0, 2: 0})
-        time.sleep(0.1)
+        time.sleep(0.0125)
         before = self.read_acceleration()
         self.write_bits(Register.CTRL5, {3: 0, 2: 1})
-        time.sleep(0.1)
+        time.sleep(0.0125)
         pos = self.read_acceleration()
         self.write_bits(Register.CTRL5, {3: 1, 2: 0})
-        time.sleep(0.1)
+        time.sleep(0.0125)
         neg = self.read_acceleration()
         self.write_bits(Register.CTRL5, {3: 0, 2: 0})
-        time.sleep(0.1)
+        time.sleep(0.0125)
 
         pos_diff = pos - before
         neg_diff = before - neg
