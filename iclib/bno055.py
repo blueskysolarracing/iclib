@@ -138,7 +138,7 @@ class BNO055:
         elif self.imu_reset_gpio.inverted != self.IMU_RESET_GPIO_INVERTED:
             raise ValueError('invalid GPIO inverted status')
 
-        if self.sa0.read():
+        if self.sa0_gpio.read():
             self.address = 0x29
         else:
             self.address = 0x28
