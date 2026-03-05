@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from enum import IntEnum
+import time
 
 from periphery import GPIO, I2C
 
@@ -205,15 +206,22 @@ class LIS2HH12:
 
     def self_test(self) -> bool:
         self.write_bits(Register.CTRL5, {3: 0, 2: 0})
+        time.sleep(0.1)
         before = self.read_acceleration()
         self.write_bits(Register.CTRL5, {3: 0, 2: 1})
+        time.sleep(0.1)
         pos = self.read_acceleration()
         self.write_bits(Register.CTRL5, {3: 1, 2: 0})
+        time.sleep(0.1)
         neg = self.read_acceleration()
         self.write_bits(Register.CTRL5, {3: 0, 2: 0})
+        time.sleep(0.1)
 
         pos_diff = pos - before
         neg_diff = before - neg
+
+        print(f"Before: {before}, Pos: {pos}, Neg: {neg}")
+        print(f"Pos Diff: {pos_diff}, Neg Diff: {neg_diff}")
 
         pos_test = all(0.07 <= i <= 1.5 for i in pos_diff)
         neg_test = all(0.07 <= i <= 1.5 for i in neg_diff)
@@ -222,3 +230,17 @@ class LIS2HH12:
         # 2.1 Mechanical characteristics, pahe 10
         # 2.6.3 Self-test, page 15
         # 8.9 CTRL5 (24h), page 35
+
+i2c_bus: I2C = I2C('/dev/apalis-i2c1')
+accelerometer: LIS2HH12 = LIS2HH12(i2c_bus, False)
+accelerometer.config(
+    odr=100,
+    measurement_range=8,
+    enable_axes=True,
+    enable_auto_inc=True,
+)
+test = accelerometer.self_test()
+temperature = accelerometer.read_temperature()
+accel = accelerometer.read_acceleration()
+
+print(f'test: {test}, temperature: {temperature}, acceleration: {accel}')
