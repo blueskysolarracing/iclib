@@ -8,6 +8,9 @@ from typing import ClassVar
 
 from periphery import I2C, GPIO
 
+
+import logging
+logging.basicConfig(level=logging.INFO)
 _logger = getLogger(__name__)
 
 
@@ -74,13 +77,14 @@ class Register(IntEnum):
     GRV_DATA_Z_MSB = 0x33
     TEMP = 0x34
     CALIB_STAT = 0x35
+    ST_RESULT = 0x36                #added
     UNIT_SEL = 0x3B
     OPR_MODE = 0x3D
     PWR_MODE = 0x3E
     SYS_TRIG = 0x3F
 
 
-class OperationMode(IntEnum):
+class OperationMode(IntEnum):       # page 21
     ACCONLY = 0x1
     MAGONLY = 0x2
     GYROONLY = 0x3
@@ -108,12 +112,13 @@ class Unit(IntEnum):
 
 @dataclass
 class BNO055:
+    ADDRESS: ClassVar[int] = 0x29
     RESET_TIMEOUT: ClassVar[float] = 2.5
     IMU_RESET_GPIO_DIRECTION: ClassVar[str] = 'out'
     IMU_RESET_GPIO_INVERTED: ClassVar[bool] = True
     i2c: I2C
     imu_reset_gpio: GPIO
-    sa0_gpio: GPIO
+    sa0: bool
     _acceleration_unit: Unit = field(init=False, default=Unit.MS2)
     _angular_velocity_unit: Unit = field(init=False, default=Unit.DPS)
     _angle_unit: Unit = field(init=False, default=Unit.DEGREES)
@@ -135,13 +140,12 @@ class BNO055:
     def __post_init__(self) -> None:
         if self.imu_reset_gpio.direction != self.IMU_RESET_GPIO_DIRECTION:
             raise ValueError('invalid GPIO direction')
-        elif self.imu_reset_gpio.inverted != self.IMU_RESET_GPIO_INVERTED:
+        if self.imu_reset_gpio.inverted != self.IMU_RESET_GPIO_INVERTED:            #changed from elif
             raise ValueError('invalid GPIO inverted status')
-
-        if self.sa0_gpio.read():
-            self.address = 0x29
+        if (self.sa0):
+            self.ADDRESS = 0x29
         else:
-            self.address = 0x28
+            self.ADDRESS = 0x28
 
     def select_operation_mode(
             self,
@@ -175,13 +179,13 @@ class BNO055:
     def write(self, register: Register, data: int) -> None:
         message = I2C.Message([register, data])
 
-        self.i2c.transfer(self.address, [message])
+        self.i2c.transfer(self.ADDRESS, [message])
 
     def read(self, register: Register, length: int) -> list[int]:
         write_message = I2C.Message([register])
         read_message = I2C.Message([0] * length, read=True)
 
-        self.i2c.transfer(self.address, [write_message, read_message])
+        self.i2c.transfer(self.ADDRESS, [write_message, read_message])
 
         return list(read_message.data)
 
@@ -199,6 +203,8 @@ class BNO055:
         self.write(Register.SYS_TRIG, 0x20)
         sleep(self.RESET_TIMEOUT)
         _logger.info('Resetting (2) BNO055')
+
+# --UNITS----------------------------------------------------------------------------------------------------------------------------------------------------
 
     @property
     def acceleration_unit(self) -> Unit:
@@ -287,6 +293,8 @@ class BNO055:
     @property
     def raw_mode(self) -> int:
         return self.read(Register.OPR_MODE, 1)[0] & 0x0F
+    
+# --Reading Sensor----------------------------------------------------------------------------------------------------------------------------------------------------
 
     def _get_vector(
             self,
@@ -323,6 +331,7 @@ class BNO055:
             y / representation,
             z / representation,
         )
+    
 
     ACCELERATION_UNIT_REPRESENTATIONS: ClassVar[dict[Unit, int]] = {
         Unit.MS2: 100,
@@ -485,3 +494,54 @@ class BNO055:
             temperature -= 1 << 8
 
         return temperature / self.temperature_unit_representation
+
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+def main():
+    i2c = I2C("/dev/apalis-i2c3")  # check with command run "i2cdetect -l"
+    reset_gpio = GPIO("/dev/gpiochip4",21,"out", inverted = True) #SENSOR_IMU_RST pin on toradex
+    sa0 = False                                                     # SA0 pin is low
+    imu = BNO055(i2c, reset_gpio, sa0)
+    
+    chip_id = imu.read(Register.CHIP_ID, 1)
+    _logger.info(f"chip id: {str(chip_id)}")                             # should be 0xA0
+    imu.select_operation_mode(False, False, False)                       # set to configuration mode (page 22)
+    imu.reset()
+
+    sleep(1)
+
+    chip_id = imu.read(Register.CHIP_ID, 1)
+    _logger.info(f"chip id: {str(chip_id)}")                             # should be 0xA0
+    imu.select_units(Unit.MS2, Unit.DPS, Unit.DEGREES, Unit.CELSIUS)
+    imu.write(Register.PWR_MODE, 0x00)                                     # ensure its default
+
+    # imu.write(Register.PAGE_ID, 0)
+    imu.write(Register.SYS_TRIG, 0)     #self test
+    st_result = imu.read(Register.ST_RESULT, 1)
+    if st_result[0] & 0x0F == 0x0F:
+        print("self-test passed")
+    else:
+        print("self-test failed")
+
+    imu.write(Register.OPR_MODE, OperationMode.NDOF)                # not really neccessary
+    # verify configuration here (read registers)
+
+    try:
+        while True:
+            print("Acceleration: ", imu.acceleration)
+            print("Magnetometer", imu.magnetic_field)
+            print("Gyroscope: ", imu.angular_velocity)
+            print("Euler Angles: ", imu.orientation)
+            print("Quaternion", imu.quaternion)
+            print("Linear Acceleration: ", imu.linear_acceleration)
+            print("Gravity Vector: ", imu.gravity)
+            print("Temperature: ", imu.temperature)
+            print("-------------------------------------------------------------")
+            sleep(1)
+    except KeyboardInterrupt:
+        print("Interrupted by user")
+    finally:
+        imu.close
+
+if __name__ == "__main__":
+    main()
