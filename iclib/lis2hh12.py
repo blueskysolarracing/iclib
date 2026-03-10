@@ -159,7 +159,7 @@ class LIS2HH12:
         if measurement_range is not None:
             if measurement_range not in [2, 4, 8]:
                 raise ValueError('invalid measurement range')
- 
+
             match measurement_range:
                 case 2:
                     range_bits = {5: 0, 4: 0}
@@ -189,7 +189,7 @@ class LIS2HH12:
 
     def read_acceleration(self) -> 'LIS2HH12.Vector':
         raw = self.read(Register.OUT_X_L, 6)
-        
+
         xg = (
             twos_complement((raw[1] << 8 | raw[0]), 16)
             * 0.0305 * self.measurement_range / 1000.0
