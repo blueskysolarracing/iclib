@@ -4,9 +4,10 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 import time
 
-from periphery import GPIO, I2C
+from periphery import I2C
 
 from iclib.utilities import twos_complement
+
 
 class Register(IntEnum):
     TEMP_L = 0x0B
@@ -47,10 +48,11 @@ class Register(IntEnum):
     ZL_REFERENCE = 0x3E
     ZH_REFERENCE = 0x3F
 
+
 @dataclass
 class LIS2HH12:
     """A Python driver for STMicroelectronics LIS2HH12 accelerometer"""
-    
+
     i2c: I2C
     """The I2C bus."""
     sa0_pin: bool
@@ -149,7 +151,7 @@ class LIS2HH12:
                     odr_bits = {6: 1, 5: 0, 4: 1}
                 case 800:
                     odr_bits = {6: 1, 5: 1, 4: 0}
-            
+
             self.output_data_rate = odr
             self.write_bits(Register.CTRL1, odr_bits)
             # 8.5 CTRL1 (20h), page 31
@@ -157,7 +159,7 @@ class LIS2HH12:
         if measurement_range is not None:
             if measurement_range not in [2, 4, 8]:
                 raise ValueError('invalid measurement range')
-            
+ 
             match measurement_range:
                 case 2:
                     range_bits = {5: 0, 4: 0}
@@ -167,9 +169,9 @@ class LIS2HH12:
                     range_bits = {5: 1, 4: 1}
 
             self.measurement_range = measurement_range
-            self.write_bits(Register.CTRL4, range_bits) 
+            self.write_bits(Register.CTRL4, range_bits)
             # 8.8 CTRL4 (23h), page 34
-        
+
         if enable_axes:
             self.write_bits(Register.CTRL1, {2: 1, 1: 1, 0: 1})
             # Enable all axes, 8.5 CTRL1 (20h), page 31
