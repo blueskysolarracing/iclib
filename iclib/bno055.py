@@ -327,7 +327,6 @@ class BNO055:
             y / representation,
             z / representation,
         )
-    
 
     ACCELERATION_UNIT_REPRESENTATIONS: ClassVar[dict[Unit, int]] = {
         Unit.MS2: 100,
