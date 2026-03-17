@@ -117,7 +117,7 @@ class BNO055:
     IMU_RESET_GPIO_INVERTED: ClassVar[bool] = True
     i2c: I2C
     imu_reset_gpio: GPIO
-    sa0: bool = False
+    sa0: bool = True
     address: int = field(init=False)
     _acceleration_unit: Unit = field(init=False, default=Unit.MS2)
     _angular_velocity_unit: Unit = field(init=False, default=Unit.DPS)
