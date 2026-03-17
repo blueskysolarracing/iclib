@@ -112,13 +112,13 @@ class Unit(IntEnum):
 
 @dataclass
 class BNO055:
-    ADDRESS: ClassVar[int] = 0x29
     RESET_TIMEOUT: ClassVar[float] = 2.5
     IMU_RESET_GPIO_DIRECTION: ClassVar[str] = 'out'
     IMU_RESET_GPIO_INVERTED: ClassVar[bool] = True
     i2c: I2C
     imu_reset_gpio: GPIO
     sa0: bool
+    address: int = field(init=False)
     _acceleration_unit: Unit = field(init=False, default=Unit.MS2)
     _angular_velocity_unit: Unit = field(init=False, default=Unit.DPS)
     _angle_unit: Unit = field(init=False, default=Unit.DEGREES)
@@ -142,11 +142,10 @@ class BNO055:
             raise ValueError('invalid GPIO direction')
         if self.imu_reset_gpio.inverted != self.IMU_RESET_GPIO_INVERTED:
             raise ValueError('invalid GPIO inverted status')
-        if (self.sa0):
-            self.ADDRESS = 0x29
+        if self.sa0:
+            self.address = 0x29
         else:
-            self.ADDRESS = 0x28
-
+    s        elf.address = 0x28
     def select_operation_mode(
             self,
             accelerometer: bool,
@@ -179,13 +178,13 @@ class BNO055:
     def write(self, register: Register, data: int) -> None:
         message = I2C.Message([register, data])
 
-        self.i2c.transfer(self.ADDRESS, [message])
+        self.i2c.transfer(self.address, [message])
 
     def read(self, register: Register, length: int) -> list[int]:
         write_message = I2C.Message([register])
         read_message = I2C.Message([0] * length, read=True)
 
-        self.i2c.transfer(self.ADDRESS, [write_message, read_message])
+        self.i2c.transfer(self.address, [write_message, read_message])
 
         return list(read_message.data)
 
