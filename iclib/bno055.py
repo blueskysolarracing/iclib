@@ -146,6 +146,7 @@ class BNO055:
             self.address = 0x29
         else:
             self.address = 0x28
+
     def select_operation_mode(
             self,
             accelerometer: bool,
