@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from enum import IntEnum
 import time
+from typing import Iterator
 
 from periphery import I2C
 
@@ -89,7 +90,7 @@ class LIS2HH12:
                 self.z - other.z
             )
 
-        def __iter__(self):
+        def __iter__(self) -> Iterator[float]:
             return iter((self.x, self.y, self.z))
 
     def write(self, register: Register, data: int) -> None:
@@ -113,9 +114,6 @@ class LIS2HH12:
         self.write(register, raw)
 
     def read(self, register: Register, length: int) -> list[int]:
-        if length > 1:
-            register |= 0x80
-
         write_message = I2C.Message([register])
         read_message = I2C.Message([0] * length, read=True)
         self.i2c.transfer(self.address, [write_message, read_message])
@@ -138,19 +136,19 @@ class LIS2HH12:
 
             match odr:
                 case 0:
-                    odr_bits = {6: 0, 5: 0, 4: 0}
+                    odr_bits = {6: False, 5: False, 4: False}
                 case 10:
-                    odr_bits = {6: 0, 5: 0, 4: 1}
+                    odr_bits = {6: False, 5: False, 4: True}
                 case 50:
-                    odr_bits = {6: 0, 5: 1, 4: 0}
+                    odr_bits = {6: False, 5: True, 4: False}
                 case 100:
-                    odr_bits = {6: 0, 5: 1, 4: 1}
+                    odr_bits = {6: False, 5: True, 4: True}
                 case 200:
-                    odr_bits = {6: 1, 5: 0, 4: 0}
+                    odr_bits = {6: True, 5: False, 4: False}
                 case 400:
-                    odr_bits = {6: 1, 5: 0, 4: 1}
+                    odr_bits = {6: True, 5: False, 4: True}
                 case 800:
-                    odr_bits = {6: 1, 5: 1, 4: 0}
+                    odr_bits = {6: True, 5: True, 4: False}
 
             self.output_data_rate = odr
             self.write_bits(Register.CTRL1, odr_bits)
@@ -162,25 +160,25 @@ class LIS2HH12:
 
             match measurement_range:
                 case 2:
-                    range_bits = {5: 0, 4: 0}
+                    range_bits = {5: False, 4: False}
                 case 4:
-                    range_bits = {5: 1, 4: 0}
+                    range_bits = {5: True, 4: False}
                 case 8:
-                    range_bits = {5: 1, 4: 1}
+                    range_bits = {5: True, 4: True}
 
             self.measurement_range = measurement_range
             self.write_bits(Register.CTRL4, range_bits)
             # 8.8 CTRL4 (23h), page 34
 
         if enable_axes:
-            self.write_bits(Register.CTRL1, {2: 1, 1: 1, 0: 1})
+            self.write_bits(Register.CTRL1, {2: True, 1: True, 0: True})
             # Enable all axes, 8.5 CTRL1 (20h), page 31
 
         if enable_auto_inc:
-            self.write_bits(Register.CTRL4, {2: 1})
+            self.write_bits(Register.CTRL4, {2: True})
             # Enable auto increment, 8.8 CTRL4 (23h), page 34
 
-    def read_temperature(self):
+    def read_temperature(self) -> float:
         raw = self.read(Register.TEMP_L, 2)
         raw_temp = twos_complement((raw[1] << 8 | raw[0]), 16)
         temp = 25.0 + raw_temp / 8.0
@@ -207,16 +205,16 @@ class LIS2HH12:
         # 2.1 Mechanical characteristics, page 10
 
     def self_test(self) -> bool:
-        self.write_bits(Register.CTRL5, {3: 0, 2: 0})
+        self.write_bits(Register.CTRL5, {3: False, 2: False})
         time.sleep(0.0125)
         before = self.read_acceleration()
-        self.write_bits(Register.CTRL5, {3: 0, 2: 1})
+        self.write_bits(Register.CTRL5, {3: False, 2: True})
         time.sleep(0.0125)
         pos = self.read_acceleration()
-        self.write_bits(Register.CTRL5, {3: 1, 2: 0})
+        self.write_bits(Register.CTRL5, {3: True, 2: False})
         time.sleep(0.0125)
         neg = self.read_acceleration()
-        self.write_bits(Register.CTRL5, {3: 0, 2: 0})
+        self.write_bits(Register.CTRL5, {3: False, 2: False})
         time.sleep(0.0125)
 
         pos_diff = pos - before
