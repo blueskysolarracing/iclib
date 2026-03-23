@@ -271,7 +271,10 @@ class TMAG5273:
             ))
 
         if self.crc_enable == Enable.ENABLE:
-            crc = self.check_crc_error(received[0:-1], received[-1])
+            crc = self.check_crc_error(
+                [(self.address << 1) + 1] + received[0:-1],
+                received[-1],
+            )
 
         return (result, crc)
 
