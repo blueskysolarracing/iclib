@@ -220,9 +220,6 @@ class LIS2HH12:
         pos_diff = pos - before
         neg_diff = before - neg
 
-        print(f"Before: {before}, Pos: {pos}, Neg: {neg}")
-        print(f"Pos Diff: {pos_diff}, Neg Diff: {neg_diff}")
-
         pos_test = all(0.07 <= i <= 1.5 for i in pos_diff)
         neg_test = all(0.07 <= i <= 1.5 for i in neg_diff)
 
