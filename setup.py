@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='iclib',
-    version='0.0.0.dev21',
+    version='0.0.0.dev22',
     description='A collection of integrated circuit libraries in pure Python',
     long_description=open('README.rst').read(),
     long_description_content_type='text/x-rst',
@@ -29,8 +29,9 @@ setup(
     keywords=[
         'a1230',
         'adc78h89',
+        'bno055',
         'ina229',
-        'lis2ds12',
+        'lis2hh12',
         'ltc6810',
         'mcp23s17',
         'mcp4161',
@@ -45,6 +46,7 @@ setup(
         'texas instruments',
         'ti',
         'tmag5273',
+        'wavesculptor22',
     ],
     project_urls={
         'Documentation': 'https://iclib.readthedocs.io/en/latest/',
